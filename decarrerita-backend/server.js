@@ -415,7 +415,6 @@ app.get('/api/chofer/perfil/:id', async (req, res) => {
         const id_chofer = req.params.id;
         const pool = await sql.connect(dbConfig);
 
-        // CONSULTA REAJUSTADA: Se eliminó entidad_bancaria y se trae b.nombre_banco mediante JOIN
         const queryChofer = `
             SELECT 
                 c.id_usuario, 
@@ -425,7 +424,7 @@ app.get('/api/chofer/perfil/:id', async (req, res) => {
                 ch.telefono, 
                 c.correo,
                 ISNULL(ch.saldo_a_favor, 0) as saldo_a_favor,
-                b.nombre_banco as entidad_bancaria, -- Esto mapea el nombre real del banco al frontend
+                b.nombre_banco as entidad_bancaria,
                 ch.nro_cuenta,
                 ch.contacto_emergencia1,
                 ch.telefono_emergencia1,
@@ -436,19 +435,28 @@ app.get('/api/chofer/perfil/:id', async (req, res) => {
             FROM usuarios.Cuentas c
             INNER JOIN usuarios.Choferes ch ON c.id_usuario = ch.id_chofer
             LEFT JOIN operaciones.Bancos b ON ch.id_banco = b.id_banco
-            LEFT JOIN operaciones.Evaluaciones ev ON ch.id_chofer = ev.id_chofer
+            OUTER APPLY (
+                SELECT TOP 1 nota_psicologica, fecha_evaluacion 
+                FROM operaciones.Evaluaciones 
+                WHERE id_chofer = ch.id_chofer 
+                ORDER BY fecha_evaluacion DESC
+            ) ev
             WHERE c.id_usuario = @id AND c.tipo_usuario = 'Chofer'
         `;
 
-        const requestChofer = pool.request();
+
+
+       const requestChofer = pool.request();
         requestChofer.input('id', sql.Int, id_chofer);
         const resultChofer = await requestChofer.query(queryChofer);
+
+        // 👇 AÑADE ESTO PARA VER QUÉ TRAE REALMENTE LA BASE DE DATOS EN LA TERMINAL
+        console.log("DATOS DEL CHOFER DESDE SQL:", resultChofer.recordset[0]);
 
         if (resultChofer.recordset.length === 0) {
             return res.status(404).json({ success: false, message: "Chofer no encontrado." });
         }
 
-        // BUSCAR VEHÍCULOS EN EL ESQUEMA OPERACIONES
         let vehiculos = [];
         try {
             const queryVehiculos = `
@@ -473,12 +481,56 @@ app.get('/api/chofer/perfil/:id', async (req, res) => {
         });
 
     } catch (err) {
-        console.error("❌ ERROR REAL DE SQL:", err.message);
-        res.status(500).json({ 
-            success: false, 
-            message: "Error en los esquemas SQL.",
-            error: err.message 
+        console.error("❌ ERROR EN PERFIL:", err.message);
+        res.status(500).json({ success: false, message: "Error en los esquemas SQL.", error: err.message });
+    }
+});
+
+app.get('/api/chofer/traslados/:id', async (req, res) => {
+    try {
+        const id_chofer = req.params.id;
+        const inicio = req.query.inicio || '2000-01-01';
+        const fin = req.query.fin || '2099-12-31';
+
+        const pool = await sql.connect(dbConfig);
+
+        // Carreras pendientes por liquidar
+        const queryPendientes = `
+            SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
+            FROM operaciones.Traslados 
+            WHERE id_chofer = @id AND estado_pago_chofer = 'Pendiente'
+              AND fecha_traslado BETWEEN @inicio AND @fin
+            ORDER BY fecha_traslado DESC
+        `;
+        const reqP = pool.request();
+        reqP.input('id', sql.Int, id_chofer);
+        reqP.input('inicio', sql.VarChar, inicio);
+        reqP.input('fin', sql.VarChar, fin);
+        const resP = await reqP.query(queryPendientes);
+
+        // Carreras pagadas / liquidadas
+        const queryCancelados = `
+            SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
+            FROM operaciones.Traslados 
+            WHERE id_chofer = @id AND estado_pago_chofer IN ('Liquidado', 'Pagado', 'Completado')
+              AND fecha_traslado BETWEEN @inicio AND @fin
+            ORDER BY fecha_traslado DESC
+        `;
+        const reqC = pool.request();
+        reqC.input('id', sql.Int, id_chofer);
+        reqC.input('inicio', sql.VarChar, inicio);
+        reqC.input('fin', sql.VarChar, fin);
+        const resC = await reqC.query(queryCancelados);
+
+        res.json({
+            success: true,
+            pendientes: resP.recordset,
+            cancelados: resC.recordset
         });
+
+    } catch (err) {
+        console.error("❌ Error en traslados del chofer:", err.message);
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 // ENDPOINT: SEGURIDAD - MODIFICAR CONTRASEÑA DE ACCESO
@@ -529,65 +581,47 @@ app.put('/api/chofer/actualizar-contactos', async (req, res) => {
 });
 
 // ENDPOINT: AGREGAR UN VEHÍCULO ADICIONAL A UN CHOFER EXISTENTE
+// Ejemplo de cómo debe lucir la ruta en tu backend (Node.js/Express)
 app.post('/api/chofer/agregar-vehiculo', async (req, res) => {
-    const { id_cuenta, marca, modelo, placa, color } = req.body;
+    const { id_cuenta, id_chofer, marca, modelo, placa, color } = req.body;
+    const choferId = id_chofer || id_cuenta;
+    
     try {
         let pool = await sql.connect(dbConfig);
-
-        // 1. Buscar primero el id_chofer asociado a esa cuenta
-        let choferRes = await pool.request()
-            .input('id_cuenta', sql.Int, id_cuenta)
-            .query(`SELECT id_chofer FROM usuarios.Choferes WHERE id_cuenta = @id_cuenta`);
-
-        if (choferRes.recordset.length === 0) {
-            return res.status(404).json({ success: false, message: "No se encontró el registro del chofer." });
-        }
-
-        const id_chofer = choferRes.recordset[0].id_chofer;
-
-        // 2. Insertar el nuevo auto en la base de datos
-        // Nota: Queda por defecto con calificación de revisión en 0 hasta que el administrativo lo evalúe
         await pool.request()
-            .input('id_chofer', sql.Int, id_chofer)
+            .input('id_chofer', sql.Int, choferId)
             .input('marca', sql.VarChar, marca)
             .input('modelo', sql.VarChar, modelo)
             .input('placa', sql.VarChar, placa)
             .input('color', sql.VarChar, color)
-            .query(`INSERT INTO usuarios.Vehiculos (id_chofer, marca, modelo, placa, color, calificacion_revision, fecha_revision)
-                    VALUES (@id_chofer, @marca, @modelo, @placa, @color, 0, GETDATE())`);
-
-        res.json({ success: true, message: "Vehículo añadido correctamente a la flota." });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
+            // INSERTAMOS SOLO LAS COLUMNAS QUE EXISTEN EN TU CREATE TABLE
+            .query(`INSERT INTO operaciones.Vehiculos (id_chofer, marca, modelo, placa, color) 
+                    VALUES (@id_chofer, @marca, @modelo, @placa, @color)`);
+                    
+        res.json({ success: true, message: "Vehículo agregado exitosamente." });
+    } catch (error) {
+        console.error("Error al registrar vehículo en servidor:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
-
 // ENDPOINT: ACTUALIZAR EXPEDIENTE COMPLETO DEL CHOFER (TELÉFONO, BANCO Y CUENTA)
+// ENDPOINT: ACTUALIZAR EXPEDIENTE COMPLETO DEL CHOFER (BLINDADO)
 app.put('/api/chofer/actualizar-expediente/:id', async (req, res) => {
-    const id_cuenta = req.params.id; // Recibe el ID desde la URL
+    const id_cuenta = req.params.id; 
     const { telefono, entidad_bancaria, nro_cuenta, c1, t1, c2, t2 } = req.body;
     
     try {
         let pool = await sql.connect(dbConfig);
         
-        // 1. Buscamos primero el id_banco correspondiente al nombre del banco enviado (ej: "Banesco")
-        let id_banco = null;
-        if (entidad_bancaria) {
-            let bancoRes = await pool.request()
-                .input('nombre_banco', sql.VarChar, entidad_bancaria)
-                .query(`SELECT id_banco FROM operaciones.Bancos WHERE nombre_banco = @nombre_banco`);
-            
-            if (bancoRes.recordset.length > 0) {
-                id_banco = bancoRes.recordset[0].id_banco;
-            }
-        }
+        // Convertimos a número. Si viene vacío o null, se transformará en null para SQL
+        let id_banco = entidad_bancaria ? parseInt(entidad_bancaria) : null;
+        if (isNaN(id_banco)) id_banco = null;
 
-        // 2. Actualizamos los datos operativos del Chofer en la base de datos
-        // Usamos ISNULL para que si dejas un campo vacío en el formulario, mantenga el dato que ya tenía
+        // 2. Actualizamos los datos utilizando ISNULL de manera segura
         await pool.request()
             .input('id_chofer', sql.Int, id_cuenta)
             .input('telefono', sql.VarChar, telefono || null)
-            .input('id_banco', sql.Int, id_banco)
+            .input('id_banco', sql.Int, id_banco) 
             .input('nro_cuenta', sql.VarChar, nro_cuenta || null)
             .input('c1', sql.VarChar, c1 || null)
             .input('t1', sql.VarChar, t1 || null)
@@ -596,7 +630,7 @@ app.put('/api/chofer/actualizar-expediente/:id', async (req, res) => {
             .query(`
                 UPDATE usuarios.Choferes 
                 SET telefono = ISNULL(@telefono, telefono),
-                    id_banco = ISNULL(@id_banco, id_banco),
+                    id_banco = ISNULL(@id_banco, id_banco), 
                     nro_cuenta = ISNULL(@nro_cuenta, nro_cuenta),
                     contacto_emergencia1 = ISNULL(@c1, contacto_emergencia1),
                     telefono_emergencia1 = ISNULL(@t1, telefono_emergencia1),
@@ -606,9 +640,47 @@ app.put('/api/chofer/actualizar-expediente/:id', async (req, res) => {
             `);
         
         res.json({ success: true, message: "¡Expediente operativo actualizado con éxito!" });
+
     } catch (err) {
         console.error("❌ Error en actualizar-expediente:", err.message);
         res.status(500).json({ success: false, message: "Error interno del servidor SQL.", error: err.message });
+    }
+});
+// EN TU ARCHIVO server.js (Línea 618 aprox.)
+// EN TU ARCHIVO server.js
+// EN TU ARCHIVO server.js
+// ==========================================
+// ENDPOINT: OBTENER LISTA DE BANCOS
+// ==========================================
+app.get('/api/bancos', async (req, res) => {
+    try {
+        let pool = await sql.connect(dbConfig);
+        const result = await pool.request().query('SELECT * FROM operaciones.Bancos');
+        res.json(result.recordset);
+    } catch (error) {
+        // Al poner error.message aquí, el error saldrá EN LA PÁGINA WEB, no solo en la terminal
+        res.status(500).json({ error: "Fallo en SQL: " + error.message });
+    }
+});
+// ==========================================
+// ARRANQUE DEL SERVIDOR (Asegúrate de que quede así al final del archivo)
+// ==========================================
+
+// ENDPOINT: ACTUALIZAR EXPEDIENTE COMPLETO DEL CHOFER (CON ID DE BANCO DIRECTO)
+
+app.delete('/api/chofer/eliminar-vehiculo/:id', async (req, res) => {
+    const id_vehiculo = req.params.id;
+    
+    try {
+        let pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id_vehiculo', sql.Int, id_vehiculo)
+            .query(`DELETE FROM operaciones.Vehiculos WHERE id_vehiculo = @id_vehiculo`);
+            
+        res.json({ success: true, message: "Vehículo eliminado correctamente de la base de datos." });
+    } catch (error) {
+        console.error("Error al eliminar vehículo en servidor:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

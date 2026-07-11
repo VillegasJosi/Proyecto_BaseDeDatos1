@@ -2,7 +2,7 @@ const API_URL = "http://localhost:3000/api";
 let idUsuarioLogueado = null;
 
 function mostrarPantalla(idPantalla) {
-    const pantallas = ['vista-login', 'vista-registro-cliente', 'vista-registro-chofer', 'panel-cliente', 'panel-admin', 'panel-chofer'];
+    const pantallas = ['vista-login', 'vista-registro-cliente', 'vista-registro-chofer', 'panel-cliente', 'panel-admin', 'panel-chofer', 'panel-espera-admision'];
     pantallas.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('oculto');
@@ -12,7 +12,7 @@ function mostrarPantalla(idPantalla) {
 }
 
 // =================================================================
-// 1. LOGIN
+// 1. LOGIN CON VALIDACIÓN DE ADMISIÓN (PERSONAL ADMINISTRATIVO)
 // =================================================================
 async function iniciarSesion() {
     const correo = document.getElementById('correo').value;
@@ -39,10 +39,34 @@ async function iniciarSesion() {
                 mostrarPantalla('panel-admin');
                 cargarReportesFinancieros(); 
             } 
-            else if (tipoUsuario === 'Chofer') {
+           else if (tipoUsuario === 'Chofer') {
+                const notaPsico = parseFloat(datos.usuario.nota_psicologica || 0);
+                const estatusAdmision = datos.usuario.estatus_admision || 'Aprobado'; // Si no viene explícito y ya tiene nota, asumimos listo u operando según tu BD
+                const rangoMinimoPsico = 65.0;
+
+                // VALIDACIÓN ESTRICTA: Solo va a espera si literalmente está pendiente o en proceso
+                if (estatusAdmision === 'Pendiente' || estatusAdmision === 'En Proceso' || (notaPsico === 0 && estatusAdmision !== 'Aprobado')) {
+                    mostrarPantalla('panel-espera-admision');
+                    const txtEspera = document.getElementById('txt-mensaje-espera');
+                    if (txtEspera) {
+                        txtEspera.innerText = "⏳ En proceso de admisión por el personal administrativo. Tu evaluación psicológica y técnica está pendiente.";
+                    }
+                    return;
+                }
+
+                // Si ya fue evaluado pero no cumple el rango mínimo permitido
+                if (notaPsico > 0 && notaPsico < rangoMinimoPsico) {
+                    alert("No está permitido en el sistema: Tu puntaje psicológico no entra en el rango requerido de aprobación.");
+                    mostrarPantalla('vista-login');
+                    return;
+                }
+
+                // SI YA ESTÁ ADMITIDO Y APROBADO: Entra directo a su panel normal de chofer
                 mostrarPantalla('panel-chofer'); 
+                await cargarBancosDesplegable(); 
                 await cargarDatosChofer();
-            } 
+            
+            }
             else if (tipoUsuario === 'Cliente') {
                 mostrarPantalla('panel-cliente');
                 if (document.getElementById('saldo-cliente')) {
@@ -107,14 +131,14 @@ async function registrarChofer() {
         });
         const data = await res.json();
         if (data.success) {
-            alert("¡Postulación enviada!");
+            alert("¡Postulación enviada! Quedas en proceso de admisión por el personal administrativo.");
             mostrarPantalla('vista-login');
         } else { alert("Error: " + data.message); }
     } catch (err) { alert("Error de conexión."); }
 }
 
 // =================================================================
-// 3. ADMINISTRACIÓN
+// 3. ADMINISTRACIÓN (EVALUACIÓN POR PERSONAL ADMINISTRATIVO)
 // =================================================================
 async function guardarEvaluacionAdmin() {
     const id_chofer = document.getElementById('eval-id-chofer').value;
@@ -122,6 +146,10 @@ async function guardarEvaluacionAdmin() {
     const nota_vehiculo = parseInt(document.getElementById('eval-nota-vehiculo').value);
     const id_banco = document.getElementById('eval-id-banco').value;
     const nro_cuenta = document.getElementById('eval-nro-cuenta').value;
+
+    if (nota_psicologica < 65) {
+        alert("Aviso: La nota psicológica está por debajo del rango requerido (65). El chofer no será permitido en el sistema.");
+    }
 
     try {
         const res = await fetch(`${API_URL}/evaluar-postulante`, {
@@ -215,13 +243,13 @@ async function solicitarTrasladoReal() {
             document.getElementById('txt-nombre-chofer').innerText = `${data.chofer.nombre} ${data.chofer.apellido}`;
             document.getElementById('txt-auto-chofer').innerText = `${data.chofer.marca} ${data.chofer.modelo}`;
             document.getElementById('txt-costo-viaje').innerText = `$${data.costoViaje.toFixed(2)}`;
-            document.getElementById('info-vehiculo-asignado').classList.remove('oculto');
+            document.getElementById('info-vehiculo-assigned').classList.remove('oculto');
         } else { alert(data.message); }
     } catch (err) {}
 }
 
 // =================================================================
-// 5. CHOFER (LOGICA ASOCIADA A LOS NUEVOS IDS)
+// 5. CHOFER (INTERFAZ Y RESTRICCIÓN DE VEHÍCULOS)
 // =================================================================
 function cambiarTabChofer(idTab) {
     document.querySelectorAll('.tab-content-chof').forEach(el => el.classList.add('oculto'));
@@ -236,123 +264,134 @@ function cambiarTabChofer(idTab) {
     if (idTab === 'chof-tab-perfil') document.getElementById('btn-tab-perfil').classList.add('active-tab');
 }
 
+async function cargarBancosDesplegable() {
+    const selectBancos = document.getElementById('upd-chof-banco');
+    if (!selectBancos) return;
+
+    try {
+        const respuesta = await fetch(`${API_URL}/bancos`);
+        if (!respuesta.ok) throw new Error('No se pudo obtener la lista de bancos');
+        
+        const bancos = await respuesta.json();
+        selectBancos.innerHTML = '<option value="">-- Seleccione un Banco --</option>';
+
+        bancos.forEach(banco => {
+            const option = document.createElement('option');
+            option.value = banco.id_banco || banco.id;       
+            option.textContent = banco.nombre_banco || banco.nombre; 
+            selectBancos.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error al rellenar el selector de bancos:', error);
+    }
+}
+
 async function cargarDatosChofer() {
     if (!idUsuarioLogueado) return;
     try {
-        console.log("Solicitando expediente para chofer ID:", idUsuarioLogueado);
         const res = await fetch(`${API_URL}/chofer/perfil/${idUsuarioLogueado}`);
-        
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            console.error("Error del servidor:", errData);
-            alert("El servidor regresó un error 500. Revisa la terminal de Node.js para ver qué columna o tabla falló en SQL.");
-            return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
         
         if (data.success && data.chofer) {
             const chof = data.chofer;
 
-            // =========================================================
-            // 1. SALUDO DE CABECERA Y ID DE CUENTA
-            // =========================================================
+            // ==========================================
+            // 👇 AQUÍ VA EXACTAMENTE LO DE PSICOLOGÍA 👇
+            // ==========================================
+           // Reemplaza la sección del examen psicológico en cargarDatosChofer() por esto:
+// ==========================================
+            // 👇 CORRECCIÓN DEL SELECTOR PSICOLÓGICO 👇
+            // ==========================================
+            const elNotaPsico = document.getElementById('chof-nota-psico') || document.getElementById('chof-nota-psicologica') || document.getElementById('resultado-examen-psico-num') || document.querySelector('.card-resumen-psico span') || document.querySelector('#resultado-examen-psico');
+
+            if (elNotaPsico && chof.nota_psicologica !== undefined) {
+                elNotaPsico.innerText = `${chof.nota_psicologica} / 100`;
+            }
+if (chof.fecha_prueba) {
+                const fechaEvaluacion = new Date(chof.fecha_prueba);
+                
+                // Sumamos 1 año exacto para la próxima evaluación
+                const proximaEvaluacion = new Date(fechaEvaluacion);
+                proximaEvaluacion.setFullYear(proximaEvaluacion.getFullYear() + 1);
+
+                // 👇 Usamos el ID real que tienes en tu HTML de VS Code
+                const elFechaPsico = document.getElementById('chof-fecha-evaluacion') || document.getElementById('chof-fecha-psico-texto') || document.getElementById('lbl-fecha-psicológica');
+                
+                if (elFechaPsico) {
+                    elFechaPsico.innerHTML = `
+                        ${fechaEvaluacion.toLocaleDateString()} 
+                        <br><span style="font-size: 10px; color: var(--rosa-oscuro);">Próxima: ${proximaEvaluacion.toLocaleDateString()}</span>
+                    `;
+                }
+            }
+            // ==========================================
+            // ==========================================
+            // 👆 FIN DE LA SECCIÓN DE PSICOLOGÍA 👆
+            // ==========================================
+
             const txtSaludo = document.getElementById('chof-nombre-saludo') || document.querySelector('.header-driver h2 span');
             if (txtSaludo) txtSaludo.innerText = chof.nombre || 'Conductor';
 
             const txtIdTop = document.getElementById('chof-id-cuenta-top') || document.querySelector('.header-driver p span') || document.getElementById('perf-id-cuenta');
             if (txtIdTop) txtIdTop.innerText = idUsuarioLogueado;
 
-            // =========================================================
-            // 2. TARJETAS DE RESUMEN Y NOTAS
-            // =========================================================
             const saldoFavor = chof.saldo_a_favor != null ? parseFloat(chof.saldo_a_favor) : 0.00;
             const txtSaldo = document.getElementById('chof-saldo-favor') || document.querySelector('.card-resumen h3') || document.querySelector('.card h3') || document.getElementById('saldo-acumulado-cobrar');
             if (txtSaldo) txtSaldo.innerText = `$${saldoFavor.toFixed(2)}`;
 
-            // =========================================================
-            // 3. SECCIÓN DE DATOS DE IDENTIDAD FIJOS (No Modificables)
-            // =========================================================
-            const camposCargando = document.querySelectorAll('p');
-            camposCargando.forEach(p => {
-                if (p.innerText.includes("Nombre Completo:")) {
-                    p.innerHTML = `Nombre Completo: <strong>${chof.nombre} ${chof.apellido}</strong>`;
-                }
-                if (p.innerText.includes("Cédula") || p.innerText.includes("Identidad:")) {
-                    p.innerHTML = `Cédula de Identidad: <strong>${chof.cedula}</strong>`;
-                }
-                if (p.innerText.includes("Correo")) {
-                    p.innerHTML = `Correo Electrónico: <strong>${chof.correo}</strong>`;
-                }
-            });
-
-            // Mapeo directo por ID si los creaste en tu HTML
             if (document.getElementById('lbl-chof-nombre')) document.getElementById('lbl-chof-nombre').innerText = `${chof.nombre} ${chof.apellido}`;
             if (document.getElementById('lbl-chof-cedula')) document.getElementById('lbl-chof-cedula').innerText = chof.cedula;
             if (document.getElementById('lbl-chof-correo')) document.getElementById('lbl-chof-correo').innerText = chof.correo;
 
-            // =========================================================
-            // 4. MOSTRAR TODA LA INFORMACIÓN ACTUAL OPERATIVA (Como la 2da Imagen)
-            // =========================================================
-            if (document.getElementById('lbl-chof-telefono-actual')) {
-                document.getElementById('lbl-chof-telefono-actual').innerText = chof.telefono || 'No registrado';
-            }
-            if (document.getElementById('lbl-chof-banco-actual')) {
-                document.getElementById('lbl-chof-banco-actual').innerText = chof.entidad_bancaria || 'No registrado';
-            }
-            if (document.getElementById('lbl-chof-cuenta-actual')) {
-                document.getElementById('lbl-chof-cuenta-actual').innerText = chof.nro_cuenta || 'No registrada';
-            }
+            if (document.getElementById('lbl-chof-telefono-actual')) document.getElementById('lbl-chof-telefono-actual').innerText = chof.telefono || 'No registrado';
+            if (document.getElementById('lbl-chof-banco-actual')) document.getElementById('lbl-chof-banco-actual').innerText = chof.entidad_bancaria || 'No registrado';
+            if (document.getElementById('lbl-chof-cuenta-actual')) document.getElementById('lbl-chof-cuenta-actual').innerText = chof.nro_cuenta || 'No registrada';
 
-            // Contactos de emergencia actuales mostrados en texto
             if (document.getElementById('lbl-chof-c1-actual')) document.getElementById('lbl-chof-c1-actual').innerText = chof.contacto_emergencia1 || 'No registrado';
             if (document.getElementById('lbl-chof-t1-actual')) document.getElementById('lbl-chof-t1-actual').innerText = chof.telefono_emergencia1 || 'No registrado';
             if (document.getElementById('lbl-chof-c2-actual')) document.getElementById('lbl-chof-c2-actual').innerText = chof.contacto_emergencia2 || 'No registrado';
             if (document.getElementById('lbl-chof-t2-actual')) document.getElementById('lbl-chof-t2-actual').innerText = chof.telefono_emergencia2 || 'No registrado';
 
-           // =========================================================
-// 5. CAMPOS DE MODIFICACIÓN PRE-CARGADOS CON DATOS ACTUALES
-// =========================================================
-if (document.getElementById('upd-chof-telefono')) document.getElementById('upd-chof-telefono').value = chof.telefono || '';
-if (document.getElementById('upd-chof-banco')) document.getElementById('upd-chof-banco').value = chof.entidad_bancaria || '';
-if (document.getElementById('upd-chof-cuenta')) document.getElementById('upd-chof-cuenta').value = chof.nro_cuenta || '';
-if (document.getElementById('perf-chof-c1')) document.getElementById('perf-chof-c1').value = chof.contacto_emergencia1 || '';
-if (document.getElementById('perf-chof-t1')) document.getElementById('perf-chof-t1').value = chof.telefono_emergencia1 || '';
-if (document.getElementById('perf-chof-c2')) document.getElementById('perf-chof-c2').value = chof.contacto_emergencia2 || '';
-if (document.getElementById('perf-chof-t2')) document.getElementById('perf-chof-t2').value = chof.telefono_emergencia2 || '';
-            // =========================================================
-            // 6. NOTAS DE EVALUACIÓN
-            // =========================================================
-            const txtNotaPsico = document.getElementById('chof-nota-psico') || document.querySelector('.eval-box p strong') || document.getElementById('nota-psicologica-view');
-            if (txtNotaPsico) txtNotaPsico.innerText = `${chof.nota_psicologica || 0} / 100`;
-
-            const txtFechaEval = document.getElementById('chof-fecha-evaluacion') || document.getElementById('fecha-tecnica-view');
-            if (txtFechaEval) {
-                txtFechaEval.innerText = chof.fecha_prueba ? new Date(chof.fecha_prueba).toLocaleDateString() : '-- / -- / ----';
-            }
-
-            // =========================================================
-            // 7. RENDERIZAR TABLA O GRID DE VEHÍCULOS
-            // =========================================================
             const gridVehiculos = document.getElementById('chof-grid-vehiculos') || document.getElementById('mis-autos-lista');
             if (gridVehiculos) {
                 gridVehiculos.innerHTML = "";
                 let totalCarreras = 0;
+                let tieneAutoApto = false;
 
                 if (data.vehiculos && data.vehiculos.length > 0) {
                     data.vehiculos.forEach(veh => {
                         totalCarreras += (veh.total_carreras || 0);
                         const rev = veh.calificacion_revision || 0;
-                        const statusTexto = rev >= 65 ? 'Apto' : 'Revisión Pendiente';
+                        if (rev >= 65) tieneAutoApto = true;
+
+                        const statusTexto = rev >= 65 ? 'Apto (Aprobado)' : (rev === 0 ? 'En espera de evaluación por personal administrativo' : 'No está permitido (Revisión no aprobada)');
+                        const badgeColor = rev >= 65 ? 'background-color: var(--verde-pastel); color: #315c43;' : 'background-color: var(--rojo-pastel); color: #7c3a3a;';
                         
                         gridVehiculos.innerHTML += `
-                            <div style="background: #fff; padding: 12px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 10px;">
-                                <strong>🚗 ${veh.marca} ${veh.modelo}</strong> — <span style="font-size:12px; background:#eee; padding:2px 5px;">${veh.placa}</span>
-                                <p style="margin:4px 0 0 0; font-size:12px; color:#555;">Revisión Anual: ${rev}/100 (${statusTexto})</p>
+                            <div style="background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(255,183,197,0.05); position: relative;">
+                                <strong style="color: var(--texto-color); display: block; margin-bottom: 6px;">🚗 ${veh.marca} ${veh.modelo}</strong>
+                                <span style="font-size:12px; background: #fff0f2; color: var(--rosa-oscuro); padding: 3px 8px; border-radius: 6px; font-weight: bold;">${veh.placa}</span>
+                                <p style="margin:12px 0 12px 0; font-size:12px; color:#706062;">
+                                    Evaluación Vehicular: <span style="padding: 2px 6px; border-radius: 4px; font-weight: bold; ${badgeColor}">${rev}/100 - ${statusTexto}</span>
+                                </p>
+                                <button onclick="eliminarVehiculo(${veh.id_vehiculo})" style="background-color: #ffe6e8; color: #a63a50; border: 1px solid #f7c5cc; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.2s;">
+                                    🗑️ Eliminar Vehículo
+                                </button>
                             </div>`;
                     });
                 } else {
-                    gridVehiculos.innerHTML = `<p style="color:#777; font-size:13px;">No posees vehículos registrados todavía.</p>`;
+                    gridVehiculos.innerHTML = `<p style="color:#a69295; font-size:13px; font-style: italic; grid-column: span 2;">No posees vehículos registrados todavía.</p>`;
+                }
+
+                const bannerOperativo = document.getElementById('chof-banner-estado-operativo') || document.getElementById('banner-operativo-chofer');
+                if (bannerOperativo) {
+                    if (!tieneAutoApto) {
+                        bannerOperativo.innerHTML = `<div style="background-color: var(--rojo-pastel); color: #7c3a3a; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 13px;">⚠️ Alerta Operativa: Ningún cliente podrá solicitarte servicios de transporte hasta que tengas un auto registrado y aprobado con la calificación requerida por la administración.</div>`;
+                    } else {
+                        bannerOperativo.innerHTML = `<div style="background-color: var(--verde-pastel); color: #315c43; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; font-size: 13px;">✅ Tu unidad vehicular cumple con el rango requerido. Estás visible para los clientes.</div>`;
+                    }
                 }
 
                 const txtGlobalCarreras = document.getElementById('chof-total-viajes-global') || document.getElementById('total-carreras-view');
@@ -363,76 +402,76 @@ if (document.getElementById('perf-chof-t2')) document.getElementById('perf-chof-
         console.error("Error cargando interfaz de chofer:", err);
     }
 }
+
+async function eliminarVehiculo(idVehiculo) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este vehículo de tu flota?")) return;
+
+    try {
+        const res = await fetch(`${API_URL}/chofer/eliminar-vehiculo/${idVehiculo}`, {
+            method: 'DELETE',
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            alert("Vehículo eliminado correctamente.");
+            cargarDatosChofer(); // Recarga la interfaz de inmediato
+        } else {
+            alert("No se pudo eliminar el vehículo: " + data.message);
+        }
+    } catch (err) {
+        console.error("Error de red al eliminar vehículo:", err);
+        alert("Ocurrió un error al conectar con el servidor.");
+    }
+}
+
 // =================================================================
-// CORRECCIÓN: FUNCIÓN ACTUALIZAR EXPEDIENTE CHOFER EN TU FRONTEND
-// =================================================================
-// =================================================================
-// FUNCIÓN ACTUALIZAR EXPEDIENTE CHOFER (SOLO MODIFICA LO QUE SE ESCRIBA)
-// =================================================================
-// =================================================================
-// FUNCIÓN ACTUALIZAR EXPEDIENTE CHOFER (CON LIMPIEZA POST-GUARDADO)
+// 6. ACCIONES Y NUEVO AUTO EN ESPERA
 // =================================================================
 async function actualizarExpedienteChofer() {
-    // 1. Capturamos los inputs de la interfaz
     const inputTelefono = document.getElementById('upd-chof-telefono')?.value.trim() || "";
-    const inputBanco = document.getElementById('upd-chof-banco')?.value.trim() || "";
+    const inputBanco = document.getElementById('upd-chof-banco')?.value.trim() || ""; 
     const inputCuenta = document.getElementById('upd-chof-cuenta')?.value.trim() || "";
     const inputC1 = document.getElementById('perf-chof-c1')?.value.trim() || "";
     const inputT1 = document.getElementById('perf-chof-t1')?.value.trim() || "";
     const inputC2 = document.getElementById('perf-chof-c2')?.value.trim() || "";
     const inputT2 = document.getElementById('perf-chof-t2')?.value.trim() || "";
 
-    // 2. Rescatamos los valores actuales de las etiquetas fijas si los inputs vienen vacíos
     const telefono = inputTelefono !== "" ? inputTelefono : (document.getElementById('lbl-chof-telefono-actual')?.innerText || "");
-    const entidad_bancaria = inputBanco !== "" ? inputBanco : (document.getElementById('lbl-chof-banco-actual')?.innerText || "");
     const nro_cuenta = inputCuenta !== "" ? inputCuenta : (document.getElementById('lbl-chof-cuenta-actual')?.innerText || "");
     const c1 = inputC1 !== "" ? inputC1 : (document.getElementById('lbl-chof-c1-actual')?.innerText || "");
     const t1 = inputT1 !== "" ? inputT1 : (document.getElementById('lbl-chof-t1-actual')?.innerText || "");
     const c2 = inputC2 !== "" ? inputC2 : (document.getElementById('lbl-chof-c2-actual')?.innerText || "");
     const t2 = inputT2 !== "" ? inputT2 : (document.getElementById('lbl-chof-t2-actual')?.innerText || "");
 
+    const entidad_bancaria = inputBanco !== "" ? inputBanco : null;
+
     try {
-        // 3. Petición al Servidor (REVISA SI ESTA RUTA COINCIDE EXACTAMENTE CON TU BACKEND)
         const res = await fetch(`${API_URL}/chofer/actualizar-expediente/${idUsuarioLogueado}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                telefono, entidad_bancaria, nro_cuenta, c1, t1, c2, t2
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefono, entidad_bancaria, nro_cuenta, c1, t1, c2, t2 })
         });
 
-        // Si la ruta responde 404 u otro error, lanzamos una excepción para controlarlo
-        if (!res.ok) {
-            throw new Error(`Código de respuesta del servidor: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Código de respuesta del servidor: ${res.status}`);
 
         const data = await res.json();
-        
         if (data.success) {
             alert("¡Expediente actualizado con éxito!");
-            await cargarDatosChofer(); // Recarga la información arriba en tiempo real
+            await cargarDatosChofer(); 
         } else {
-            alert("Error al actualizar en Base de Datos: " + data.message);
+            alert("Error al actualizar: " + data.message);
         }
-
     } catch (err) {
-        console.error("Error detallado:", err);
-        alert("Error de conexión: No se pudo conectar con la ruta del servidor.");
+        alert("Error de conexión con el servidor.");
     } finally {
-        // =======================================================================
-        // EL SECRETO: El bloque 'finally' se ejecuta SIEMPRE (con éxito o con error)
-        // Esto vacía los cuadros inmediatamente y los deja limpios.
-        // =======================================================================
-        if (document.getElementById('upd-chof-telefono')) document.getElementById('upd-chof-telefono').value = '';
-        if (document.getElementById('upd-chof-banco')) document.getElementById('upd-chof-banco').value = '';
-        if (document.getElementById('upd-chof-cuenta')) document.getElementById('upd-chof-cuenta').value = '';
-        if (document.getElementById('perf-chof-c1')) document.getElementById('perf-chof-c1').value = '';
-        if (document.getElementById('perf-chof-t1')) document.getElementById('perf-chof-t1').value = '';
-        if (document.getElementById('perf-chof-c2')) document.getElementById('perf-chof-c2').value = '';
-        if (document.getElementById('perf-chof-t2')) document.getElementById('perf-chof-t2').value = '';
+        const inputsALimpiar = ['upd-chof-telefono', 'upd-chof-banco', 'upd-chof-cuenta', 'perf-chof-c1', 'perf-chof-t1', 'perf-chof-c2', 'perf-chof-t2'];
+        inputsALimpiar.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
     }
+
+    await cargarBancosDesplegable();
 }
 
 async function cambiarPasswordChofer() {
@@ -451,8 +490,13 @@ async function cambiarPasswordChofer() {
 }
 
 async function cargarTrasladosChofer() {
-    const fInicio = document.getElementById('chof-fecha-inicio').value;
-    const fFin = document.getElementById('chof-fecha-fin').value;
+    if (!idUsuarioLogueado) return;
+
+    const inputInicio = document.getElementById('chof-fecha-inicio').value;
+    const inputFin = document.getElementById('chof-fecha-fin').value;
+
+    const fInicio = inputInicio ? inputInicio : '2000-01-01';
+    const fFin = inputFin ? inputFin : '2099-12-31';
 
     try {
         const res = await fetch(`${API_URL}/chofer/traslados/${idUsuarioLogueado}?inicio=${fInicio}&fin=${fFin}`);
@@ -461,20 +505,36 @@ async function cargarTrasladosChofer() {
         if (data.success) {
             const tbodyP = document.getElementById('tabla-viajes-pendiente-body');
             const tbodyC = document.getElementById('tabla-viajes-cancelado-body');
+            const tbodyCE = document.getElementById('tabla-viajes-cancelados-empresa-body');
 
-            tbodyP.innerHTML = data.pendientes.length > 0 ? "" : `<tr><td colspan="4">No hay pendientes.</td></tr>`;
-            data.pendientes.forEach(v => {
-                tbodyP.innerHTML += `<tr><td>${new Date(v.fecha_traslado).toLocaleDateString()}</td><td>${v.origen}</td><td>${v.destino}</td><td>$${parseFloat(v.pago_chofer).toFixed(2)}</td></tr>`;
-            });
+            if (tbodyP) {
+                tbodyP.innerHTML = data.pendientes.length > 0 ? "" : `<tr><td colspan="4" style="text-align:center; color:#a69295; font-style:italic;">No hay carreras pendientes en este rango.</td></tr>`;
+                data.pendientes.forEach(v => {
+                    tbodyP.innerHTML += `<tr><td>${new Date(v.fecha_traslado).toLocaleDateString()}</td><td>${v.origen}</td><td>${v.destino}</td><td>$${parseFloat(v.pago_chofer).toFixed(2)}</td></tr>`;
+                });
+            }
 
-            tbodyC.innerHTML = data.cancelados.length > 0 ? "" : `<tr><td colspan="4">No hay liquidados.</td></tr>`;
-            data.cancelados.forEach(v => {
-                tbodyC.innerHTML += `<tr><td>${new Date(v.fecha_traslado).toLocaleDateString()}</td><td>${v.origen}</td><td>${v.destino}</td><td>$${parseFloat(v.pago_chofer).toFixed(2)}</td></tr>`;
-            });
+            if (tbodyC) {
+                tbodyC.innerHTML = data.cancelados.length > 0 ? "" : `<tr><td colspan="4" style="text-align:center; color:#a69295; font-style:italic;">No hay carreras liquidadas en este rango.</td></tr>`;
+                data.cancelados.forEach(v => {
+                    tbodyC.innerHTML += `<tr><td>${new Date(v.fecha_traslado).toLocaleDateString()}</td><td>${v.origen}</td><td>${v.destino}</td><td>$${parseFloat(v.pago_chofer).toFixed(2)}</td></tr>`;
+                });
+            }
+
+            // 👇 Se asegura de actualizar únicamente el contenedor propio de esta tabla
+            if (tbodyCE) {
+                tbodyCE.innerHTML = data.canceladosEmpresa.length > 0 ? "" : `<tr><td colspan="4" style="text-align:center; color:#a69295; font-style:italic;">No hay traslados cancelados por la empresa en este rango.</td></tr>`;
+                data.canceladosEmpresa.forEach(v => {
+                    tbodyCE.innerHTML += `<tr><td>${new Date(v.fecha_traslado).toLocaleDateString()}</td><td>${v.origen}</td><td>${v.destino}</td><td>$0.00</td></tr>`;
+                });
+            }
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error("Error de red cargando traslados:", err);
+    }
 }
 
+// NUEVO AUTO: Queda en espera de evaluación por el personal administrativo
 async function agregarNuevoVehiculo() {
     const marca = document.getElementById('add-veh-marca').value;
     const modelo = document.getElementById('add-veh-modelo').value;
@@ -485,16 +545,52 @@ async function agregarNuevoVehiculo() {
         const res = await fetch(`${API_URL}/chofer/agregar-vehiculo`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id_cuenta: idUsuarioLogueado, marca, modelo, placa, color })
+            // Cambiamos 'id_cuenta' por 'id_chofer' si tu backend o BD manejan ese nombre, 
+            // o dejamos ambos/el correcto que espera tu server.js:
+            body: JSON.stringify({ 
+                id_chofer: idUsuarioLogueado, 
+                // Enviamos ambos para evitar cualquier conflicto de nombres
+                marca, 
+                modelo, 
+                placa, 
+                color 
+            })
         });
         const data = await res.json();
         if (data.success) {
-            alert("Vehículo agregado correctamente.");
+            alert("Vehículo agregado correctamente. Quedará en espera de evaluación por el personal administrativo.");
             cargarDatosChofer();
+        } else {
+            alert("No está permitido registrar el vehículo: " + data.message);
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error("Error al registrar vehículo:", err);
+    }
+}
+
+async function eliminarVehiculo(idVehiculo) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este vehículo?")) return;
+
+    try {
+        const response = await fetch(`http://localhost:3000/api/chofer/eliminar-vehiculo/${idVehiculo}`, {
+            method: 'DELETE',
+        });
+        const data = await response.json();
+        if (data.success) {
+            alert("Vehículo eliminado con éxito.");
+            cargarDatosChofer(); // O la función que recargue los datos del panel
+        } else {
+            alert("No se pudo eliminar: " + data.message);
+        }
+    } catch (error) {
+        console.error("Error al eliminar vehículo:", error);
+    }
 }
 
 function cerrarSesion() {
     window.location.reload();
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Inicialización del DOM
+});

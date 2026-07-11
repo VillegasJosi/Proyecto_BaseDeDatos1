@@ -494,7 +494,7 @@ app.get('/api/chofer/traslados/:id', async (req, res) => {
 
         const pool = await sql.connect(dbConfig);
 
-        // Carreras pendientes por liquidar
+        // 1. Carreras pendientes por liquidar
         const queryPendientes = `
             SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
             FROM operaciones.Traslados 
@@ -508,11 +508,25 @@ app.get('/api/chofer/traslados/:id', async (req, res) => {
         reqP.input('fin', sql.VarChar, fin);
         const resP = await reqP.query(queryPendientes);
 
-        // Carreras pagadas / liquidadas
-        const queryCancelados = `
+        // 2. Carreras pagadas / liquidadas
+        const queryLiquidados = `
             SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
             FROM operaciones.Traslados 
             WHERE id_chofer = @id AND estado_pago_chofer IN ('Liquidado', 'Pagado', 'Completado')
+              AND fecha_traslado BETWEEN @inicio AND @fin
+            ORDER BY fecha_traslado DESC
+        `;
+        const reqL = pool.request();
+        reqL.input('id', sql.Int, id_chofer);
+        reqL.input('inicio', sql.VarChar, inicio);
+        reqL.input('fin', sql.VarChar, fin);
+        const resL = await reqL.query(queryLiquidados);
+
+        // 3. Carreras canceladas por la empresa
+        const queryCancelados = `
+            SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
+            FROM operaciones.Traslados 
+            WHERE id_chofer = @id AND estado_pago_chofer = 'Cancelado'
               AND fecha_traslado BETWEEN @inicio AND @fin
             ORDER BY fecha_traslado DESC
         `;
@@ -525,7 +539,8 @@ app.get('/api/chofer/traslados/:id', async (req, res) => {
         res.json({
             success: true,
             pendientes: resP.recordset,
-            cancelados: resC.recordset
+            cancelados: resL.recordset,
+            canceladosEmpresa: resC.recordset
         });
 
     } catch (err) {

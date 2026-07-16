@@ -56,20 +56,35 @@
         <input type="text" id="reg-chof-contacto2" placeholder="Contacto 2 (Ej: Pedro Gomez - Amigo)">
         <input type="text" id="reg-chof-telefono2" placeholder="Teléfono Contacto 2">
 
+        <div class="mb-3">
+            <label class="form-label">Entidad Bancaria</label>
+            <select id="reg-chof-banco" class="form-control" required>
+                <option value="">-- Seleccione un Banco --</option>
+                <option value="1">Banco de Venezuela</option>
+                <option value="2">Banesco</option>
+                <option value="3">Banco Mercantil</option>
+                <option value="4">BBVA Provincial</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Número de Cuenta (20 dígitos)</label>
+            <input type="text" id="reg-chof-nrocuenta" class="form-control" placeholder="Ej: 01020000000000000000" maxlength="20" required>
+        </div>
+
         <button onclick="registrarChofer()">Enviar Postulación</button>
         <button class="btn-secundario" onclick="mostrarPantalla('vista-login')">Volver al Login</button>
     </div>
 
-<!-- PANTALLA DE ESPERA DE ADMISIÓN (NUEVO CHOFER) -->
-<div id="panel-espera-admision" class="oculto container-auth" style="text-align: center; padding: 40px;">
-    <div style="background: #ffffff; padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); max-width: 450px; margin: 0 auto; box-shadow: 0 4px 15px rgba(255,183,197,0.1);">
-        <h2 style="color: var(--rosa-oscuro); margin-bottom: 15px;">⏳ En proceso de admisión</h2>
-        <p id="txt-mensaje-espera" style="color: var(--texto-color); font-size: 14px; line-height: 1.5; margin-bottom: 25px;">
-            Tu postulación o datos están siendo evaluados por el personal administrativo. Por favor, espera a que aprueben tu expediente.
-        </p>
-        <button onclick="cerrarSesion()" class="btn-principal" style="background-color: var(--rosa-oscuro); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">Cerrar Sesión</button>
+    <div id="panel-espera-admision" class="oculto container-auth" style="text-align: center; padding: 40px;">
+        <div style="background: #ffffff; padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); max-width: 450px; margin: 0 auto; box-shadow: 0 4px 15px rgba(255,183,197,0.1);">
+            <h2 style="color: var(--rosa-oscuro); margin-bottom: 15px;">⏳ En proceso de admisión</h2>
+            <p id="txt-mensaje-espera" style="color: var(--texto-color); font-size: 14px; line-height: 1.5; margin-bottom: 25px;">
+                Tu postulación o datos están siendo evaluados por el personal administrativo. Por favor, espera a que aprueben tu expediente.
+            </p>
+            <button onclick="cerrarSesion()" class="btn-principal" style="background-color: var(--rosa-oscuro); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">Cerrar Sesión</button>
+        </div>
     </div>
-</div>
 
     <div id="panel-cliente" class="contenedor-card oculto">
         <div class="header-panel">
@@ -127,67 +142,142 @@
         </div>
     </div>
 
-    <div id="panel-admin" class="contenedor-card oculto">
-        <h2>🏢 Panel Administrativo</h2>
-        <p>Gestión Operativa y Evaluaciones Anuales</p>
-        <hr>
-        
-        <div class="modulo-admin">
-            <h3>🗂️ Evaluar Chofer y Vehículo Postulante</h3>
-            <label for="eval-id-chofer">Selecciona el Chofer por ID:</label>
-            <input type="number" id="eval-id-chofer" placeholder="ID del Chofer (Ej: 2)">
-            
-            <input type="number" id="eval-nota-psico" placeholder="Nota Psicológica (73 - 100)">
-            <input type="number" id="eval-nota-vehiculo" placeholder="Nota Vehículo (65 - 100)">
-            
-            <label>Entidad Bancaria asignada:</label>
-            <input type="number" id="eval-id-banco" placeholder="ID Banco (1: Venezuela, 2: Banesco...)">
-            <input type="text" id="eval-nro-cuenta" placeholder="Número de Cuenta (20 dígitos)">
-            
-            <button onclick="guardarEvaluacionAdmin()">Registrar Evaluación y Aprobación</button>
-        </div>
-        
-        <button class="btn-danger" onclick="cerrarSesion()">Cerrar Sesión</button>
-    </div>
-
-    <div id="panel-admin2" class="contenedor-card oculto">
-        <div class="header-panel">
-            <h2>Panel Administrativo - Control Financiero</h2>
+    <div id="panel-admin" class="contenedor-card oculto" style="max-width: 900px; width: 95%;">
+        <div class="header-panel" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>🛠️ Panel Administrativo</h2>
             <button class="btn-danger" onclick="cerrarSesion()">Cerrar Sesión</button>
         </div>
 
-        <div class="metrics-container">
-            <div class="saldo-box box-empresa">
-                <p>Ganancias Totales Empresa (30%)</p>
-                <h2 id="ganancia-empresa-total">$0.00</h2>
+        <h3>Gestión Operativa y Financiera</h3>
+        <hr style="margin: 15px 0;">
+
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-bottom: 20px;">
+            <h4>📋 Evaluar Chofer y Vehículo Postulante</h4>
+            <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <input type="number" id="adm-id-chofer" placeholder="ID del Chofer">
+                <input type="number" id="adm-nota-psico" placeholder="Nota Psicológica (73 - 100)">
+                <input type="number" id="adm-nota-veh" placeholder="Nota Vehículo (65 - 100)">
+                <input type="number" id="adm-id-banco" placeholder="ID Banco (1: Venezuela, 2: Banesco...)">
+                <input type="text" id="adm-nro-cuenta" placeholder="Número de Cuenta (20 dígitos)" class="full-width" style="grid-column: span 2;">
             </div>
-            <div class="saldo-box box-custodia">
-                <p>Total Custodia (Saldos Clientes)</p>
-                <h2 id="saldo-clientes-total">$0.00</h2>
+            <button onclick="registrarEvaluacionAdmin()" class="btn-primary" style="margin-top: 15px;">Registrar Evaluación y Aprobación</button>
+        </div>
+
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h4>🚗 Vehículos Pendientes por Revisión y Aprobación</h4>
+                <button onclick="cargarVehiculosPendientes()" class="btn-secondary" style="padding: 6px 12px;">Actualizar Lista</button>
+            </div>
+            <table class="tabla-datos" style="margin-top: 10px; width: 100%;">
+                <thead>
+                    <tr><th>ID</th><th>Chofer ID</th><th>Marca/Modelo</th><th>Placa</th><th>Acción</th></tr>
+                </thead>
+                <tbody id="tabla-vehiculos-pendientes-body">
+                    <tr><td colspan="5" style="text-align:center; color:#a69295;">Cargando pendientes...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card" style="padding: 20px; background: #fff; border-radius: 8px; margin-top: 20px;">
+            <h3>📈 Ganancias de la Empresa por Período</h3>
+            <div style="display: flex; gap: 10px; margin: 15px 0;">
+                <div>
+                    <label>Desde:</label>
+                    <input type="date" id="ganancia-desde" class="form-control">
+                </div>
+                <div>
+                    <label>Hasta:</label>
+                    <input type="date" id="ganancia-hasta" class="form-control">
+                </div>
+                <div style="align-self: flex-end;">
+                    <button onclick="consultarGananciasEmpresa()" class="btn-primary" style="padding: 8px 15px;">Calcular Ganancias</button>
+                </div>
+            </div>
+            <div id="resultado-ganancias" style="font-size: 16px; font-weight: bold; color: #555; margin-top: 10px;">
+                Selecciona un rango de fechas para ver lo recaudado (30% de los traslados).
             </div>
         </div>
 
-        <button class="btn-secundario" onclick="cargarReportesFinancieros()">🔄 Actualizar Reportes Financieros</button>
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8;">
+            <h4>💰 Liquidación de Pagos a Choferes</h4>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <input type="number" id="adm-pago-id-chofer" placeholder="ID del Chofer a Consultar">
+                <button onclick="consultarDeudaChofer()" class="btn-secondary" style="white-space: nowrap;">Consultar Deuda</button>
+            </div>
+            <div id="resultado-deuda" style="margin: 10px 0; font-weight: bold; color: #27ae60;"></div>
+            
+<div style="margin-top: 15px;">
+    <h5 style="color: #555; margin-bottom: 8px;">📦 Traslados Pendientes de Este Chofer</h5>
+    <div style="overflow-x: auto;">
+        <table class="tabla-datos" style="width: 100%; font-size: 13px;">
+            <thead>
+                <tr>
+                    <th>ID Viaje</th>
+                    <th>Fecha</th>
+                    <th>Origen -> Destino</th>
+                    <th>Ganancia Chofer</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpo-traslados-pendientes-chofer">
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 10px; color: #888;">Consulta la deuda de un chofer para ver sus traslados.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 
-        <hr>
+            <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <input type="number" id="adm-monto-pagar" placeholder="Monto a Pagar ($)">
+                <input type="text" id="adm-ref-pago" placeholder="Nro de Referencia Bancaria">
+            </div>
+            <button onclick="ejecutarPagoChofer()" class="btn-primary" style="margin-top: 15px;">Ejecutar Pago / Cancelar Traslados</button>
+        </div>
 
-        <div class="seccion-operativa formulario-pago">
-            <h3>💳 Registrar Liquidación de Pago a Chofer</h3>
-            <p class="txt-sub">
-                Utiliza este formulario para registrar las transferencias bancarias hechas a los choferes para pagar su saldo acumulado.
-            </p>
-            <div class="pago-form-inputs">
-                <input type="number" id="pago-chof-id" placeholder="ID del Chofer (Ej: 2)">
-                <input type="number" id="pago-chof-monto" placeholder="Monto a Liquidar ($)" step="0.01">
-                <input type="text" id="pago-chof-ref" placeholder="Número de Referencia de Transferencia">
-                <button class="btn-success" onclick="ejecutarPagoChofer()">Confirmar y Registrar Pago</button>
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-top: 20px;">
+            <h3>📜 Historial de Pagos Realizados a Chofer</h3>
+            <div style="display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap;">
+                <div>
+                    <label>ID Chofer:</label>
+                    <input type="number" id="hist-id-chofer" class="form-control" placeholder="Ej: 2">
+                </div>
+                <div>
+                    <label>Desde:</label>
+                    <input type="date" id="hist-pago-desde" class="form-control">
+                </div>
+                <div>
+                    <label>Hasta:</label>
+                    <input type="date" id="hist-pago-hasta" class="form-control">
+                </div>
+                <div style="align-self: flex-end;">
+                    <button onclick="consultarHistorialPagosChofer()" class="btn-primary" style="padding: 8px 15px;">Ver Historial</button>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; margin-top: 15px;">
+                <table class="tabla-datos" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>ID Pago</th>
+                            <th>Fecha</th>
+                            <th>Referencia</th>
+                            <th>Monto Pagado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpo-historial-pagos">
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 15px; color: #888;">Ingresa un ID y rango de fechas para buscar.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
+
     </div>
 
-    <!-- Coloca esto dentro de la pestaña de resumen o arriba en el panel del chofer -->
-<div id="chof-banner-estado-operativo"></div>
     <div id="panel-chofer" class="contenedor-card oculto">
+        <div id="chof-banner-estado-operativo"></div>
+
         <div class="header-driver">
             <h2>Bienvenido, <span id="chof-nombre-saludo">Chofer</span></h2>
             <p>ID Cuenta: #<span id="chof-id-cuenta-top">---</span></p>
@@ -234,8 +324,8 @@
                     <div class="eval-divisor"></div>
                     <div class="eval-dato">
                         <span class="eval-lbl">Fecha de Evaluación</span>
-                    <span id="chof-fecha-psico-texto">Fecha de Evaluación -- / -- / ----</span>
-                </div>
+                        <span id="chof-fecha-psico-texto">Fecha de Evaluación -- / -- / ----</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -258,171 +348,171 @@
             <button onclick="agregarNuevoVehiculo()" style="margin-top:10px;">Registrar Auto</button>
         </div>
 
-<div id="chof-tab-viajes" class="tab-content-chof oculto">
-    <h3>📅 Historial y Control de Traslados</h3>
-    
-    <div class="filtro-fechas-contenedor">
-        <div class="campo-filtro">
-            <label>📅 Fecha Desde:</label>
-            <input type="date" id="chof-fecha-inicio">
-        </div>
-        <div class="campo-filtro">
-            <label>📅 Fecha Hasta:</label>
-            <input type="date" id="chof-fecha-fin">
-        </div>
-        <div>
-            <button onclick="cargarTrasladosChofer()" class="btn-buscar-carrera">Buscar Carrera</button>
-        </div>
-    </div>
-
-    <div class="seccion-historial" style="margin-top: 20px;">
-        <h3 style="color: #d35400;">⏳ Carreras Pendientes por Liquidar</h3>
-        <table class="tabla-datos">
-            <thead>
-                <tr><th>Fecha</th><th>Origen</th><th>Destino</th><th>Ganancia Chofer</th></tr>
-            </thead>
-            <tbody id="tabla-viajes-pendiente-body">
-                <tr><td colspan="4" style="text-align:center; color:#a69295;">Selecciona un rango...</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="seccion-historial" style="margin-top: 20px;">
-        <h3 style="color: #27ae60;">✅ Carreras Pagadas / Liquidadas</h3>
-        <table class="tabla-datos">
-            <thead>
-                <tr><th>Fecha</th><th>Origen</th><th>Destino</th><th>Monto Pagado</th></tr>
-            </thead>
-            <tbody id="tabla-viajes-cancelado-body">
-                <tr><td colspan="4" style="text-align:center; color:#a69295;">Selecciona un rango...</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="seccion-historial" style="margin-top: 20px;">
-        <h3 style="color: #b33939;">❌ Traslados Cancelados por la Empresa</h3>
-        <table class="tabla-datos">
-            <thead>
-                <tr><th>Fecha</th><th>Origen</th><th>Destino</th><th>Monto</th></tr>
-            </thead>
-            <tbody id="tabla-viajes-cancelados-empresa-body">
-                <tr><td colspan="4" style="text-align:center; color:#a69295;">Selecciona un rango...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-  
-<section id="chof-tab-perfil" class="tab-content-chof oculto">
-        <div class="expediente-main-box">
+        <div id="chof-tab-viajes" class="tab-content-chof oculto">
+            <h3>📅 Historial y Control de Traslados</h3>
             
-            <div class="info-personal-box">
-                <div class="avatar-placeholder">👤</div>
-                <h3 id="lbl-chof-nombre">-- --</h3>
-                <div class="badge-identity">Chofer Verificado</div>
-                
-                <div class="mini-data-list">
-                    <div class="mini-data-item">
-                        <span class="lbl-gray">Cédula:</span>
-                        <span class="txt-bold" id="lbl-chof-cedula">--</span>
-                    </div>
-                    <div class="mini-data-item">
-                        <span class="lbl-gray">Correo:</span>
-                        <span class="txt-bold" id="lbl-chof-correo">--</span>
-                    </div>
+            <div class="filtro-fechas-contenedor">
+                <div class="campo-filtro">
+                    <label>📅 Fecha Desde:</label>
+                    <input type="date" id="chof-fecha-inicio">
+                </div>
+                <div class="campo-filtro">
+                    <label>📅 Fecha Hasta:</label>
+                    <input type="date" id="chof-fecha-fin">
+                </div>
+                <div>
+                    <button onclick="cargarTrasladosChofer()" class="btn-buscar-carrera">Buscar Carrera</button>
                 </div>
             </div>
 
-            <div class="info-operativa-container">
-                
-                <div class="section-card operational-view">
-                    <h4>Información Operativa Actual</h4>
-                    <div class="info-operativa-grid">
-                        <div class="grid-item">
-                            <span class="lbl-gray">Teléfono:</span>
-                            <span class="txt-bold" id="lbl-chof-telefono-actual">No registrado</span>
-                        </div>
-                        <div class="grid-item">
-                            <span class="lbl-gray">Banco Destino:</span>
-                            <span class="txt-bold" id="lbl-chof-banco-actual">No registrado</span>
-                        </div>
-                        <div class="grid-item full-width">
-                            <span class="lbl-gray">Nro. de Cuenta:</span>
-                            <span class="txt-bold data-account" id="lbl-chof-cuenta-actual">No registrada</span>
-                        </div>
-                        
-                        <div class="grid-item highlight-contact">
-                            <span class="lbl-gray">Contacto de Emergencia 1:</span>
-                            <span class="txt-bold" id="lbl-chof-c1-actual">No registrado</span>
-                            <span class="lbl-gray phone-sub">Telf: <strong id="lbl-chof-t1-actual">--</strong></span>
-                        </div>
-                        <div class="grid-item highlight-contact">
-                            <span class="lbl-gray">Contacto de Emergencia 2:</span>
-                            <span class="txt-bold" id="lbl-chof-c2-actual">No registrado</span>
-                            <span class="lbl-gray phone-sub">Telf: <strong id="lbl-chof-t2-actual">--</strong></span>
-                        </div>
-                    </div>
-                </div>
+            <div class="seccion-historial" style="margin-top: 20px;">
+                <h3 style="color: #d35400;">⏳ Carreras Pendientes por Liquidar</h3>
+                <table class="tabla-datos">
+                    <thead>
+                        <tr><th>Fecha</th><th>Origen</th><th>Destino</th><th>Ganancia Chofer</th></tr>
+                    </thead>
+                    <tbody id="tabla-viajes-pendiente-body">
+                        <tr><td colspan="4" style="text-align:center; color:#a69295;">Selecciona un rango...</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
-                <div class="section-card form-box style-update-form">
-                    <h4>Actualizar Datos del Expediente</h4>
-                    <p class="form-tip">⚠️ Los campos que dejes vacíos conservarán su información actual.</p>
-                    
-                    <div class="form-grid-2">
-                        <div class="input-group">
-                            <label for="upd-chof-telefono">Nuevo Teléfono Celular</label>
-                            <input type="text" id="upd-chof-telefono" placeholder="Ej: 0412-1234567">
-                        </div>
-                        <div class="input-group">
-                            <label for="upd-chof-banco">Cambiar Entidad Bancaria</label>
-                            <select id="upd-chof-banco">
-                                <option value="">-- Seleccione un Banco --</option>
-                            </select>
-                        </div>
-                        <div class="input-group full-width">
-                            <label for="upd-chof-cuenta">Nuevo Número de Cuenta (20 dígitos)</label>
-                            <input type="text" id="upd-chof-cuenta" placeholder="Ej: 01020000000000000000" maxlength="20">
-                        </div>
-                        
-                        <div class="input-group">
-                            <label for="perf-chof-c1">Contacto Emergencia 1</label>
-                            <input type="text" id="perf-chof-c1" placeholder="Nombre de contacto">
-                        </div>
-                        <div class="input-group">
-                            <label for="perf-chof-t1">Teléfono Contacto 1</label>
-                            <input type="text" id="perf-chof-t1" placeholder="Teléfono de contacto">
-                        </div>
-                        <div class="input-group">
-                            <label for="perf-chof-c2">Contacto Emergencia 2</label>
-                            <input type="text" id="perf-chof-c2" placeholder="Nombre de contacto">
-                        </div>
-                        <div class="input-group">
-                            <label for="perf-chof-t2">Teléfono Contacto 2</label>
-                            <input type="text" id="perf-chof-t2" placeholder="Teléfono de contacto">
-                        </div>
-                    </div>
-                    <button class="btn-primary" onclick="actualizarExpedienteChofer()">Guardar Cambios</button>
-                </div>
+            <div class="seccion-historial" style="margin-top: 20px;">
+                <h3 style="color: #27ae60;">✅ Carreras Pagadas / Liquidadas</h3>
+                <table class="tabla-datos">
+                    <thead>
+                        <tr><th>Fecha</th><th>Origen</th><th>Destino</th><th>Monto Pagado</th></tr>
+                    </thead>
+                    <tbody id="tabla-viajes-cancelado-body">
+                        <tr><td colspan="4" style="text-align:center; color:#a69295;">Selecciona un rango...</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
-                <div class="section-card form-box">
-                    <h4>Seguridad de la Cuenta</h4>
-                    <div class="form-grid-2">
-                        <div class="input-group">
-                            <label for="perf-chof-pass-actual">Contraseña Actual</label>
-                            <input type="password" id="perf-chof-pass-actual" placeholder="••••••••">
-                        </div>
-                        <div class="input-group">
-                            <label for="perf-chof-pass-nueva">Nueva Contraseña</label>
-                            <input type="password" id="perf-chof-pass-nueva" placeholder="Mínimo 6 caracteres">
-                        </div>
-                    </div>
-                    <button class="btn-secondary" onclick="cambiarPasswordChofer()">Modificar Contraseña</button>
-                </div>
-
+            <div class="seccion-historial" style="margin-top: 20px;">
+                <h3 style="color: #b33939;">❌ Traslados Cancelados por la Empresa</h3>
+                <table class="tabla-datos">
+                    <thead>
+                        <tr><th>Fecha</th><th>Origen</th><th>Destino</th><th>Monto</th></tr>
+                    </thead>
+                    <tbody id="tabla-viajes-cancelados-empresa-body">
+                        <tr><td colspan="4" style="text-align:center; color:#a69295;">Selecciona un rango...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-    </section>
-</div>
+
+        <section id="chof-tab-perfil" class="tab-content-chof oculto">
+            <div class="expediente-main-box">
+                
+                <div class="info-personal-box">
+                    <div class="avatar-placeholder">👤</div>
+                    <h3 id="lbl-chof-nombre">-- --</h3>
+                    <div class="badge-identity">Chofer Verificado</div>
+                    
+                    <div class="mini-data-list">
+                        <div class="mini-data-item">
+                            <span class="lbl-gray">Cédula:</span>
+                            <span class="txt-bold" id="lbl-chof-cedula">--</span>
+                        </div>
+                        <div class="mini-data-item">
+                            <span class="lbl-gray">Correo:</span>
+                            <span class="txt-bold" id="lbl-chof-correo">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-operativa-container">
+                    
+                    <div class="section-card operational-view">
+                        <h4>Información Operativa Actual</h4>
+                        <div class="info-operativa-grid">
+                            <div class="grid-item">
+                                <span class="lbl-gray">Teléfono:</span>
+                                <span class="txt-bold" id="lbl-chof-telefono-actual">No registrado</span>
+                            </div>
+                            <div class="grid-item">
+                                <span class="lbl-gray">Banco Destino:</span>
+                                <span class="txt-bold" id="lbl-chof-banco-actual">No registrado</span>
+                            </div>
+                            <div class="grid-item full-width">
+                                <span class="lbl-gray">Nro. de Cuenta:</span>
+                                <span class="txt-bold data-account" id="lbl-chof-cuenta-actual">No registrada</span>
+                            </div>
+                            
+                            <div class="grid-item highlight-contact">
+                                <span class="lbl-gray">Contacto de Emergencia 1:</span>
+                                <span class="txt-bold" id="lbl-chof-c1-actual">No registrado</span>
+                                <span class="lbl-gray phone-sub">Telf: <strong id="lbl-chof-t1-actual">--</strong></span>
+                            </div>
+                            <div class="grid-item highlight-contact">
+                                <span class="lbl-gray">Contacto de Emergencia 2:</span>
+                                <span class="txt-bold" id="lbl-chof-c2-actual">No registrado</span>
+                                <span class="lbl-gray phone-sub">Telf: <strong id="lbl-chof-t2-actual">--</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-card form-box style-update-form">
+                        <h4>Actualizar Datos del Expediente</h4>
+                        <p class="form-tip">⚠️ Los campos que dejes vacíos conservarán su información actual.</p>
+                        
+                        <div class="form-grid-2">
+                            <div class="input-group">
+                                <label for="upd-chof-telefono">Nuevo Teléfono Celular</label>
+                                <input type="text" id="upd-chof-telefono" placeholder="Ej: 0412-1234567">
+                            </div>
+                            <div class="input-group">
+                                <label for="upd-chof-banco">Cambiar Entidad Bancaria</label>
+                                <select id="upd-chof-banco">
+                                    <option value="">-- Seleccione un Banco --</option>
+                                </select>
+                            </div>
+                            <div class="input-group full-width">
+                                <label for="upd-chof-cuenta">Nuevo Número de Cuenta (20 dígitos)</label>
+                                <input type="text" id="upd-chof-cuenta" placeholder="Ej: 01020000000000000000" maxlength="20">
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="perf-chof-c1">Contacto Emergencia 1</label>
+                                <input type="text" id="perf-chof-c1" placeholder="Nombre de contacto">
+                            </div>
+                            <div class="input-group">
+                                <label for="perf-chof-t1">Teléfono Contacto 1</label>
+                                <input type="text" id="perf-chof-t1" placeholder="Teléfono de contacto">
+                            </div>
+                            <div class="input-group">
+                                <label for="perf-chof-c2">Contacto Emergencia 2</label>
+                                <input type="text" id="perf-chof-c2" placeholder="Nombre de contacto">
+                            </div>
+                            <div class="input-group">
+                                <label for="perf-chof-t2">Teléfono Contacto 2</label>
+                                <input type="text" id="perf-chof-t2" placeholder="Teléfono de contacto">
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="actualizarExpedienteChofer()">Guardar Cambios</button>
+                    </div>
+
+                    <div class="section-card form-box">
+                        <h4>Seguridad de la Cuenta</h4>
+                        <div class="form-grid-2">
+                            <div class="input-group">
+                                <label for="perf-chof-pass-actual">Contraseña Actual</label>
+                                <input type="password" id="perf-chof-pass-actual" placeholder="••••••••">
+                            </div>
+                            <div class="input-group">
+                                <label for="perf-chof-pass-nueva">Nueva Contraseña</label>
+                                <input type="password" id="perf-chof-pass-nueva" placeholder="Mínimo 6 caracteres">
+                            </div>
+                        </div>
+                        <button class="btn-secondary" onclick="cambiarPasswordChofer()">Modificar Contraseña</button>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

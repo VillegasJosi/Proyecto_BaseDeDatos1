@@ -8,6 +8,7 @@
 </head>
 <body>
 
+    <!-- VISTA LOGIN -->
     <div id="vista-login" class="contenedor-card">
         <h2>🚗 Decarrerita</h2>
         <p>Introduce tus credenciales de acceso</p>
@@ -22,6 +23,7 @@
         </div>
     </div>
 
+    <!-- VISTA REGISTRO CLIENTE -->
     <div id="vista-registro-cliente" class="contenedor-card oculto">
         <h3>📝 Registro de Cliente</h3>
         <input type="text" id="reg-cli-nombre" placeholder="Nombre">
@@ -34,6 +36,7 @@
         <button class="btn-secundario" onclick="mostrarPantalla('vista-login')">Volver al Login</button>
     </div>
 
+    <!-- VISTA REGISTRO CHOFER -->
     <div id="vista-registro-chofer" class="contenedor-card oculto">
         <h3>🚛 Postulación de Chofer</h3>
         <p>Regístrate con tus datos básicos personales. El personal administrativo gestionará tu aprobación.</p>
@@ -76,6 +79,7 @@
         <button class="btn-secundario" onclick="mostrarPantalla('vista-login')">Volver al Login</button>
     </div>
 
+    <!-- PANEL ESPERA ADMISIÓN -->
     <div id="panel-espera-admision" class="oculto container-auth" style="text-align: center; padding: 40px;">
         <div style="background: #ffffff; padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); max-width: 450px; margin: 0 auto; box-shadow: 0 4px 15px rgba(255,183,197,0.1);">
             <h2 style="color: var(--rosa-oscuro); margin-bottom: 15px;">⏳ En proceso de admisión</h2>
@@ -86,62 +90,231 @@
         </div>
     </div>
 
+    <!--PANEL CLIENTE-->
     <div id="panel-cliente" class="contenedor-card oculto">
-        <div class="header-panel">
-            <h2>Panel de Cliente</h2>
-            <button class="btn-danger" onclick="cerrarSesion()">Cerrar Sesión</button>
-        </div>
-
-        <div class="saldo-box">
-            <p>Tu Saldo Disponible</p>
-            <h1 id="saldo-cliente">$0.00</h1>
-        </div>
-
-        <hr>
-
-        <div class="seccion-operativa">
-            <h3>🚖 Solicitar un Traslado</h3>
-            <input type="text" id="viaje-origen" placeholder="Punto A (Origen)">
-            <input type="text" id="viaje-destino" placeholder="Punto B (Destino)">
-            <button class="btn-success" onclick="solicitarTrasladoReal()">Pedir Carrera</button>
-            
-            <div id="info-vehiculo-assigned" class="modulo-informativo oculto">
-                <h4>✅ ¡Chofer Asignado!</h4>
-                <p><strong>Chofer:</strong> <span id="txt-nombre-chofer"></span></p>
-                <p><strong>Vehículo:</strong> <span id="txt-auto-chofer"></span></p>
-                <p><strong>Costo del viaje:</strong> <span id="txt-costo-viaje"></span></p>
+    
+    <!-- ENCABEZADO DE PERFIL ESTILO DASHBOARD -->
+    <header class="perfil-header-card" style="display:flex; justify-content:space-between; align-items:center; gap:15px;">
+        <div style="display:flex; align-items:center; gap:15px;">
+            <div class="perfil-avatar-placeholder">👤</div>
+            <div class="perfil-info-principal">
+                <h2 id="cli-nombre-usuario">Nombre del Cliente</h2>
+                <p id="cli-correo-usuario">cliente@email.com</p>
+                <span class="badge-rol cliente">Pasajero / Cliente</span>
             </div>
         </div>
+        <button onclick="cerrarSesion()" class="btn-danger" style="padding:10px 14px;">Cerrar Sesión</button>
+    </header>
 
-        <hr>
+    <!-- NAVEGACIÓN POR PESTAÑAS (Estilo visual idéntico al del chofer, pero enfocado al cliente) -->
+    <div class="tabs-container-perfil">
+        <button id="btn-cli-tab-inicio" class="tab-btn-perfil active" onclick="cambiarTabPerfilCliente('cli-tab-inicio')">
+            <span class="icono">🏠</span> Inicio & Viajes
+        </button>
+        <button id="btn-cli-tab-pagos" class="tab-btn-perfil" onclick="cambiarTabPerfilCliente('cli-tab-pagos')">
+            <span class="icono">💳</span> Pagos y Saldo
+        </button>
+<button id="btn-cli-tab-historial" class="tab-btn-perfil" onclick="cambiarTabPerfilCliente('cli-tab-historial')">
+            <span class="icono">📜</span> Historial de Carreras
+        </button>
+<button id="btn-cli-tab-ajustes" class="tab-btn-perfil" onclick="cambiarTabPerfilCliente('cli-tab-ajustes')">
+                <span class="icono">⚙️</span> Mi Perfil y Seguridad
+        </button>
+    </div>
 
-        <div class="seccion-operativa">
-            <h3>💳 Recargar Saldo de Usuario</h3>
-            <input type="number" id="recarga-monto" placeholder="Monto a recargar ($)">
-            <input type="text" id="recarga-referencia" placeholder="Número de Referencia">
-            <input type="text" id="recarga-banco" placeholder="Banco de Origen (Ej: Banesco)">
-            <button onclick="ejecutarRecargaSaldo()">Registrar Pago</button>
+    <!-- SECCIÓN 1: INICIO Y VIAJE ACTUAL -->
+    <div id="cli-tab-inicio" class="tab-content-perfil">
+        <div class="card-seccion-perfil">
+            <h3>📍 Solicitar un Traslado</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>¿Dónde estás? (Origen)</label>
+                    <input type="text" id="cli-origen" placeholder="Ej. Alta Vista, Puerto Ordaz">
+                </div>
+                <div class="form-group">
+                    <label>¿A dónde vas? (Destino)</label>
+                    <input type="text" id="cli-destino" placeholder="Ej. Unare II">
+                </div>
+            </div>
+            <button class="btn-accion-principal" onclick="solicitarCarreraCliente()">Pedir Carrerita 🚗</button>
         </div>
 
-        <hr>
-
-        <div class="seccion-operativa">
-            <h3>📋 Historial de Recargas</h3>
-            <button class="btn-secundario" onclick="cargarHistorialRecargas()">Actualizar Historial</button>
-            <table class="tabla-datos">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Banco</th>
-                        <th>Referencia</th>
-                        <th>Monto</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-recargas-body"></tbody>
-            </table>
+        <!-- Estado del viaje activo del cliente -->
+        <div id="cli-viaje-activo-card" class="card-seccion-perfil oculto" style="border-left: 4px solid #f39c12;">
+            <h3>🚗 Estado de tu Viaje en Curso</h3>
+            <p><strong>Chofer asignado:</strong> <span id="cli-lbl-chofer">Buscando...</span></p>
+            <p><strong>Vehículo:</strong> <span id="cli-lbl-auto">...</span></p>
+            <p><strong>Estado:</strong> <span id="cli-lbl-estado" style="color: #e67e22; font-weight: bold;">En camino</span></p>
+            <button class="btn-accion-peligro" onclick="cancelarViajeCliente()">Cancelar Solicitud</button>
         </div>
     </div>
 
+    <!-- SECCIÓN 2: PAGOS Y SALDO -->
+    <div id="cli-tab-pagos" class="tab-content-perfil oculto">
+        <div class="card-seccion-perfil saldo-box">
+            <h3>💰 Tu Saldo Disponible</h3>
+            <div class="monto-grande" id="cli-saldo-actual">$0.00</div>
+            <p class="nota-sub">El saldo se descuenta automáticamente al finalizar cada viaje confirmado[cite: 1].</p>
+        </div>
+
+        <div class="card-seccion-perfil">
+            <h3>💳 Registrar Pago Móvil / Recarga</h3>
+            <div class="form-group">
+                <label>Banco Emisor:</label>
+                <input type="text" id="cli-banco-pago" placeholder="Ej. Banesco / Venezuela">
+            </div>
+            <div class="form-group">
+                <label>Número de Referencia:</label>
+                <input type="text" id="cli-ref-pago" placeholder="Últimos 6 dígitos">
+            </div>
+            <div class="form-group">
+                <label>Monto en $ o su equivalente:</label>
+                <input type="number" id="cli-monto-pago" placeholder="0.00">
+            </div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button class="btn-accion-secundario" onclick="enviarRecargaCliente()">Reportar Recarga</button>
+            </div>
+        </div>
+
+      <div class="card-seccion-perfil" style="margin-top:12px;">
+    <h3>📥 Historial de Recargas</h3>
+    <div style="overflow-x:auto;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e5e7eb;">
+            <div>
+                <label style="display:block; margin-bottom:6px; font-weight:600; color:#374151;">Desde:</label>
+                <input type="date" id="cli-recargas-fecha-inicio" style="padding:8px; border:1px solid #d1d5db; border-radius:8px; min-width:140px;">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:6px; font-weight:600; color:#374151;">Hasta:</label>
+                <input type="date" id="cli-recargas-fecha-fin" style="padding:8px; border:1px solid #d1d5db; border-radius:8px; min-width:140px;">
+            </div>
+            <div>
+                <button onclick="cargarHistorialRecargas()" class="btn-accion-secundario" style="padding:10px 14px; border-radius:8px;">Ver Historial de Recargas</button>
+            </div>
+        </div>
+        <table class="tabla-perfil-estilo" style="width:100%">
+            <thead>
+                <tr>
+                    <th style="text-align:left; padding:8px">Fecha</th>
+                    <th style="text-align:left; padding:8px">Banco</th>
+                    <th style="text-align:left; padding:8px">Referencia</th>
+                    <th style="text-align:left; padding:8px">Monto</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-recargas-body">
+                <tr><td colspan="4" style="text-align:center; padding:12px; color:#6b7280">No hay recargas registradas.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+    <!-- SECCIÓN 3: HISTORIAL DE CARRERAS -->
+    <div id="cli-tab-historial" class="tab-content-perfil oculto">
+        <div class="card-seccion-perfil">
+            <h3>📜 Tus Viajes Realizados</h3>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px; align-items:flex-end; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e5e7eb;">
+                <div>
+                    <label style="display:block; margin-bottom:6px; font-weight:600; color:#374151;">Desde:</label>
+                    <input type="date" id="cli-fecha-inicio" style="padding:8px; border:1px solid #d1d5db; border-radius:8px; min-width:140px;">
+                </div>
+                <div>
+                    <label style="display:block; margin-bottom:6px; font-weight:600; color:#374151;">Hasta:</label>
+                    <input type="date" id="cli-fecha-fin" style="padding:8px; border:1px solid #d1d5db; border-radius:8px; min-width:140px;">
+                </div>
+                <div>
+                    <button onclick="cargarHistorialCliente()" class="btn-accion-secundario" style="padding:10px 14px; border-radius:8px;">Buscar Viajes</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="tabla-perfil-estilo" style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:#f8fafc;">
+                            <th style="text-align:left; padding:10px;">Fecha</th>
+                            <th style="text-align:left; padding:10px;">Ruta</th>
+                            <th style="text-align:left; padding:10px;">Chofer</th>
+                            <th style="text-align:left; padding:10px;">Costo</th>
+                            <th style="text-align:left; padding:10px;">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cli-tabla-historial-body">
+                        <tr><td colspan="5" class="text-center" style="padding:16px; color:#6b7280;">No tienes viajes registrados recientemente.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECCIÓN 4: MI PERFIL Y SEGURIDAD -->
+    <div id="cli-tab-ajustes" class="tab-content-perfil oculto">
+        <div class="expediente-main-box">
+            <div class="info-personal-box">
+                <div class="avatar-placeholder">👤</div>
+                <h3 id="lbl-cli-nombre">-- --</h3>
+                <div class="badge-identity">Cliente Verificado</div>
+                <div class="mini-data-list">
+                    <div class="mini-data-item">
+                        <span class="lbl-gray">Cédula:</span>
+                        <span class="txt-bold" id="lbl-cli-cedula">--</span>
+                    </div>
+                    <div class="mini-data-item">
+                        <span class="lbl-gray">Correo:</span>
+                        <span class="txt-bold" id="lbl-cli-correo">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-operativa-container">
+                <div class="section-card operational-view">
+                    <h4>Información Actual del Perfil</h4>
+                    <div class="info-operativa-grid">
+                        <div class="grid-item">
+                            <span class="lbl-gray">Teléfono:</span>
+                            <span class="txt-bold" id="lbl-cli-telefono-actual">No registrado</span>
+                        </div>
+                        <div class="grid-item">
+                            <span class="lbl-gray">Dirección Frecuente:</span>
+                            <span class="txt-bold" id="lbl-cli-direccion-actual">No registrada</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card style-update-form">
+                    <h4>Actualizar Datos de la Cuenta</h4>
+                    <p class="form-tip">⚠️ Los campos que dejes vacíos conservarán su información actual.</p>
+                    <div class="form-grid-2">
+                        <div class="input-group">
+                            <label for="upd-cli-telefono">Nuevo Teléfono Celular</label>
+                            <input type="text" id="upd-cli-telefono" placeholder="Ej: 0412-1234567">
+                        </div>
+                        <div class="input-group">
+                            <label for="upd-cli-direccion">Nueva Dirección Frecuente</label>
+                            <input type="text" id="upd-cli-direccion" placeholder="Ej: Urbanización Los Olivos">
+                        </div>
+                    </div>
+                    <button class="btn-primary" onclick="guardarPerfilCliente()">Guardar Cambios</button>
+                </div>
+
+                <div class="section-card form-box">
+                    <h4>Seguridad de la Cuenta</h4>
+                    <div class="form-grid-2">
+                        <div class="input-group">
+                            <label for="cli-pass-actual">Contraseña Actual</label>
+                            <input type="password" id="cli-pass-actual" placeholder="••••••••">
+                        </div>
+                        <div class="input-group">
+                            <label for="cli-pass-nueva">Nueva Contraseña</label>
+                            <input type="password" id="cli-pass-nueva" placeholder="Mínimo 6 caracteres">
+                        </div>
+                    </div>
+                    <button class="btn-secondary" onclick="cambiarPasswordCliente()">Modificar Contraseña</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+    <!-- PANEL ADMIN -->
     <div id="panel-admin" class="contenedor-card oculto" style="max-width: 900px; width: 95%;">
         <div class="header-panel" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2>🛠️ Panel Administrativo</h2>
@@ -178,54 +351,53 @@
             </table>
         </div>
 
-        <div class="card" style="padding: 20px; background: #fff; border-radius: 8px; margin-top: 20px;">
-            <h3>📈 Ganancias de la Empresa por Período</h3>
-            <div style="display: flex; gap: 10px; margin: 15px 0;">
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-top: 20px;">
+            <h4>📈 Ganancias de la Empresa por Período</h4>
+            <div style="display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; align-items: flex-end;">
                 <div>
-                    <label>Desde:</label>
-                    <input type="date" id="ganancia-desde" class="form-control">
+                    <label style="display:block; margin-bottom:6px; font-weight:600;">Desde:</label>
+                    <input type="date" id="ganancia-desde" class="form-control" style="min-width: 160px;">
                 </div>
                 <div>
-                    <label>Hasta:</label>
-                    <input type="date" id="ganancia-hasta" class="form-control">
+                    <label style="display:block; margin-bottom:6px; font-weight:600;">Hasta:</label>
+                    <input type="date" id="ganancia-hasta" class="form-control" style="min-width: 160px;">
                 </div>
-                <div style="align-self: flex-end;">
+                <div>
                     <button onclick="consultarGananciasEmpresa()" class="btn-primary" style="padding: 8px 15px;">Calcular Ganancias</button>
                 </div>
             </div>
-            <div id="resultado-ganancias" style="font-size: 16px; font-weight: bold; color: #555; margin-top: 10px;">
+            <div id="resultado-ganancias" style="font-size: 16px; font-weight: bold; color: #6b4f55; margin-top: 10px; background: #fff; padding: 12px 14px; border-radius: 8px; border: 1px solid #f6dce2;">
                 Selecciona un rango de fechas para ver lo recaudado (30% de los traslados).
             </div>
         </div>
 
-        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8;">
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-top: 20px;">
             <h4>💰 Liquidación de Pagos a Choferes</h4>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <input type="number" id="adm-pago-id-chofer" placeholder="ID del Chofer a Consultar">
                 <button onclick="consultarDeudaChofer()" class="btn-secondary" style="white-space: nowrap;">Consultar Deuda</button>
             </div>
-            <div id="resultado-deuda" style="margin: 10px 0; font-weight: bold; color: #27ae60;"></div>
-            
-<div style="margin-top: 15px;">
-    <h5 style="color: #555; margin-bottom: 8px;">📦 Traslados Pendientes de Este Chofer</h5>
-    <div style="overflow-x: auto;">
-        <table class="tabla-datos" style="width: 100%; font-size: 13px;">
-            <thead>
-                <tr>
-                    <th>ID Viaje</th>
-                    <th>Fecha</th>
-                    <th>Origen -> Destino</th>
-                    <th>Ganancia Chofer</th>
-                </tr>
-            </thead>
-            <tbody id="cuerpo-traslados-pendientes-chofer">
-                <tr>
-                    <td colspan="4" style="text-align: center; padding: 10px; color: #888;">Consulta la deuda de un chofer para ver sus traslados.</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+
+            <div id="contenedor-liquidacion" style="display: none; margin-top: 15px;">
+                <div id="resultado-deuda" style="margin: 10px 0; font-weight: bold; color: #27ae60;"></div>
+                <div style="overflow-x: auto;">
+                    <table class="tabla-datos" style="width: 100%; font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th>ID Viaje</th>
+                                <th>Fecha</th>
+                                <th>Origen -> Destino</th>
+                                <th>Ganancia Chofer</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo-traslados-pendientes-chofer">
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 10px; color: #888;">Consulta la deuda de un chofer para ver sus traslados.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                 <input type="number" id="adm-monto-pagar" placeholder="Monto a Pagar ($)">
@@ -273,14 +445,41 @@
             </div>
         </div>
 
+        <div class="seccion-admin-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-top: 20px;">
+            <h3>📜 Historial de Viajes Cancelados por Chofer</h3>
+            <div style="display: flex; gap: 10px; margin: 15px 0;">
+                <input type="number" id="hist-id-chofer-cancelados" class="form-control" placeholder="ID del Chofer">
+                <button onclick="cargarHistorialCanceladosAdmin()" class="btn-primary" style="padding: 8px 15px; white-space: nowrap;">Ver Historial</button>
+            </div>
+            
+            <div style="overflow-x: auto; margin-top: 15px;">
+                <table class="tabla-datos" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>ID Viaje</th>
+                            <th>Fecha</th>
+                            <th>Ruta (Origen -> Destino)</th>
+                            <th>Cancelado Por</th>
+                            <th>Motivo / Mensaje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpo-historial-cancelados-admin">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 15px; color: #888;">Ingresa el ID del chofer para ver sus cancelaciones.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
+    <!-- PANEL CHOFER -->
     <div id="panel-chofer" class="contenedor-card oculto">
         <div id="chof-banner-estado-operativo"></div>
 
         <div class="header-driver">
             <h2>Bienvenido, <span id="chof-nombre-saludo">Chofer</span></h2>
-            <p>ID Cuenta: #<span id="chof-id-cuenta-top">---</span></p>
+            <span>ID Cuenta: <strong id="chof-id-cuenta">#---</strong></span>
             <button onclick="cerrarSesion()" class="btn-logout">Cerrar Sesión</button>
         </div>
 
@@ -291,6 +490,7 @@
             <button id="btn-tab-perfil" class="tab-btn" onclick="cambiarTabChofer('chof-tab-perfil')">Mi Perfil / Expediente</button>
         </div>
 
+        <!-- TAB RESUMEN -->
         <div id="chof-tab-resumen" class="tab-content-chof">
             <h3>📊 Resumen de Actividad</h3>
 
@@ -328,8 +528,37 @@
                     </div>
                 </div>
             </div>
+
+            <div class="seccion-chofer-card" style="background: #fff8f9; padding: 20px; border-radius: 12px; border: 1px solid #ffd1d8; margin-top: 20px;">
+                <h4>🚨 Viajes Pendientes</h4>
+
+               <!---<div style="margin-top: 10px;">
+                    <h5>Viajes Activos</h5>
+                    <table class="tabla-datos" style="width: 100%; margin-top: 10px;">
+                        <thead>
+                            <tr><th>ID</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Acción</th></tr>
+                        </thead>
+                        <tbody id="tabla-viajes-activos-chofer">
+                            <tr><td colspan="5" style="text-align:center; color:#a69295;">No hay viajes activos.</td></tr>
+                        </tbody>
+                    </table>
+                </div>-->
+
+                <div style="margin-top: 20px;">
+                    <h5>Solicitudes Pendientes</h5>
+                    <table class="tabla-datos" style="width: 100%; margin-top: 10px;">
+                        <thead>
+                            <tr><th>ID</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Acción</th></tr>
+                        </thead>
+                        <tbody id="tabla-viajes-pendientes-chofer">
+                            <tr><td colspan="5" style="text-align:center; color:#a69295;">No hay solicitudes pendientes.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
+        <!-- TAB AUTOS -->
         <div id="chof-tab-autos" class="tab-content-chof oculto">
             <h3>🚗 Flota de Vehículos Registrados</h3>
             <p class="txt-sub">Abajo verás tus autos y su estatus de revisión técnica.</p>
@@ -348,6 +577,7 @@
             <button onclick="agregarNuevoVehiculo()" style="margin-top:10px;">Registrar Auto</button>
         </div>
 
+        <!-- TAB VIAJES -->
         <div id="chof-tab-viajes" class="tab-content-chof oculto">
             <h3>📅 Historial y Control de Traslados</h3>
             
@@ -402,6 +632,7 @@
             </div>
         </div>
 
+        <!-- TAB PERFIL -->
         <section id="chof-tab-perfil" class="tab-content-chof oculto">
             <div class="expediente-main-box">
                 

@@ -17,6 +17,24 @@ const dbConfig = {
     }
 };
 
+async function asegurarColumnaDireccionCliente() {
+    try {
+        const pool = await sql.connect(dbConfig);
+        await pool.request().query(`
+            IF COL_LENGTH('usuarios.Clientes', 'direccion_frecuente') IS NULL
+            BEGIN
+                ALTER TABLE usuarios.Clientes ADD direccion_frecuente VARCHAR(200) NULL
+            END
+        `);
+    } catch (err) {
+        console.warn('No se pudo asegurar la columna direccion_frecuente:', err.message);
+    }
+}
+
+(async () => {
+    await asegurarColumnaDireccionCliente();
+})();
+
 // ==========================================
 // 1. ENDPOINT: LOGIN
 // ==========================================
@@ -28,19 +46,21 @@ app.post('/api/login', async (req, res) => {
             .input('correo', sql.VarChar, correo)
             .input('contrasena', sql.VarChar, contrasena)
             .query(`
-                SELECT C.id_usuario, C.correo, C.tipo_usuario, CH.estatus,
-                       ISNULL(ev.nota_psicologica, 0) as nota_psicologica,
-                       ISNULL(ev.nota_vehiculo, 0) as nota_vehiculo
-                FROM usuarios.Cuentas C 
-                LEFT JOIN usuarios.Choferes CH ON C.id_usuario = CH.id_chofer 
-                OUTER APPLY (
-                    SELECT TOP 1 nota_psicologica, nota_vehiculo 
-                    FROM operaciones.Evaluaciones 
-                    WHERE id_chofer = CH.id_chofer 
-                    ORDER BY fecha_evaluacion DESC
-                ) ev
-                WHERE C.correo = @correo AND C.contrasena = @contrasena
-            `);
+    SELECT C.id_usuario, C.correo, C.tipo_usuario, CH.estatus,
+           ISNULL(ev.nota_psicologica, 0) as nota_psicologica,
+           ISNULL(ev.nota_vehiculo, 0) as nota_vehiculo,
+           ISNULL(CL.saldo_usuario, 0) as saldo_usuario  -- <--- AGREGADO
+    FROM usuarios.Cuentas C 
+    LEFT JOIN usuarios.Choferes CH ON C.id_usuario = CH.id_chofer 
+    LEFT JOIN usuarios.Clientes CL ON C.id_usuario = CL.id_cliente -- <--- AGREGADO
+    OUTER APPLY (
+        SELECT TOP 1 nota_psicologica, nota_vehiculo 
+        FROM operaciones.Evaluaciones 
+        WHERE id_chofer = CH.id_chofer 
+        ORDER BY fecha_evaluacion DESC
+    ) ev
+    WHERE C.correo = @correo AND C.contrasena = @contrasena
+`);
 
         if (result.recordset.length === 0) {
             return res.status(401).json({ success: false, message: "Correo o contraseña incorrectos." });
@@ -49,17 +69,18 @@ app.post('/api/login', async (req, res) => {
         let usuario = result.recordset[0];
 
         // Devolvemos el objeto usuario completo incluyendo las notas del chofer
-        res.json({
-            success: true,
-            usuario: {
-                id_usuario: usuario.id_usuario,
-                correo: usuario.correo,
-                tipo_usuario: usuario.tipo_usuario,
-                estatus: usuario.estatus || 'Pendiente',
-                nota_psicologica: usuario.nota_psicologica, // <--- Agregado
-                nota_vehiculo: usuario.nota_vehiculo       // <--- Agregado
-            }
-        });
+       res.json({
+    success: true,
+    usuario: {
+        id_usuario: usuario.id_usuario,
+        correo: usuario.correo,
+        tipo_usuario: usuario.tipo_usuario,
+        estatus: usuario.estatus || 'Pendiente',
+        nota_psicologica: usuario.nota_psicologica,
+        nota_vehiculo: usuario.nota_vehiculo,
+        saldo: usuario.saldo_usuario // <--- AGREGADO
+    }
+});
     } catch (err) {
         console.error("Error en el login:", err);
         res.status(500).json({ success: false, message: err.message });
@@ -233,17 +254,45 @@ app.post('/api/admin/evaluar-chofer', async (req, res) => {
 app.get('/api/historial-recargas/:id', async (req, res) => {
     try {
         const idClienteInt = parseInt(req.params.id);
-        let pool = await sql.connect(dbConfig);
-        let result = await pool.request()
-            .input('id', sql.Int, idClienteInt)
-            .query(`SELECT r.fecha_recarga, r.monto, r.nro_referencia, b.nombre_banco 
-                    FROM operaciones.Recargas r
-                    INNER JOIN operaciones.Bancos b ON r.id_banco_origen = b.id_banco
-                    WHERE r.id_cliente = @id 
-                    ORDER BY r.fecha_recarga DESC`);
+        const inicioRaw = req.query.inicio ? req.query.inicio.toString().trim() : null;
+        const finRaw = req.query.fin ? req.query.fin.toString().trim() : null;
 
-        res.json({ success: true, recargas: result.recordset });
+        let pool = await sql.connect(dbConfig);
+        console.log(`HistorialRecargas: id=${idClienteInt} inicioRaw=${inicioRaw} finRaw=${finRaw}`);
+
+        let request = pool.request().input('id', sql.Int, idClienteInt);
+        let dateClause = '';
+
+        if (inicioRaw && finRaw) {
+            const inicioDate = new Date(`${inicioRaw}T00:00:00`);
+            const finDate = new Date(`${finRaw}T23:59:59`);
+            request.input('inicio', sql.DateTime, inicioDate);
+            request.input('fin', sql.DateTime, finDate);
+            dateClause = ' AND CAST(r.fecha_recarga AS DATE) BETWEEN CONVERT(date, @inicio) AND CONVERT(date, @fin)';
+        } else if (inicioRaw) {
+            const inicioDate = new Date(`${inicioRaw}T00:00:00`);
+            request.input('inicio', sql.DateTime, inicioDate);
+            dateClause = ' AND CAST(r.fecha_recarga AS DATE) >= CONVERT(date, @inicio)';
+        } else if (finRaw) {
+            const finDate = new Date(`${finRaw}T23:59:59`);
+            request.input('fin', sql.DateTime, finDate);
+            dateClause = ' AND CAST(r.fecha_recarga AS DATE) <= CONVERT(date, @fin)';
+        }
+
+        const query = `SELECT r.fecha_recarga, r.monto, r.nro_referencia, b.nombre_banco 
+                        FROM operaciones.Recargas r
+                        INNER JOIN operaciones.Bancos b ON r.id_banco_origen = b.id_banco
+                        WHERE r.id_cliente = @id ${dateClause}
+                        ORDER BY r.fecha_recarga DESC`;
+
+        let result = await request.query(query);
+
+        res.json({
+            success: true,
+            recargas: result.recordset
+        });
     } catch (err) {
+        console.error('Error en historial-recargas:', err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -326,7 +375,7 @@ app.post('/api/solicitar-traslado', async (req, res) => {
 
         let choferRes = await transaction.request()
             .query(`
-                SELECT TOP 1 CH.id_chofer, CH.nombre, CH.apellido, V.id_vehiculo, V.marca, V.modelo, V.placa, V.color
+                SELECT CH.id_chofer, CH.nombre, CH.apellido, V.id_vehiculo, V.marca, V.modelo, V.placa, V.color
                 FROM operaciones.Evaluaciones E
                 INNER JOIN usuarios.Choferes CH ON E.id_chofer = CH.id_chofer
                 INNER JOIN operaciones.Vehiculos V ON E.id_vehiculo = V.id_vehiculo
@@ -347,12 +396,10 @@ app.post('/api/solicitar-traslado', async (req, res) => {
             .query(`UPDATE usuarios.Clientes SET saldo_usuario = saldo_usuario - @costo 
                     OUTPUT INSERTED.saldo_usuario WHERE id_cliente = @id_cliente`);
 
-        await transaction.request()
-            .input('id_chofer', sql.Int, choferAsignado.id_chofer)
-            .input('pago', sql.Decimal(18, 2), PAGO_CHOFER)
-            .query(`UPDATE usuarios.Choferes SET saldo_a_favor = saldo_a_favor + @pago WHERE id_chofer = @id_chofer`);
+        // Nota: No acreditamos saldo al chofer aquí. Se acreditará cuando el chofer acepte el viaje
+        // (ruta PUT /api/traslados/:id/aceptar) para evitar saldos adelantados en viajes pendientes.
 
-        await transaction.request()
+        let result = await transaction.request() // <-- Asignamos el resultado aquí
             .input('id_cliente', sql.Int, id_cliente)
             .input('id_chofer', sql.Int, choferAsignado.id_chofer)
             .input('id_vehiculo', sql.Int, choferAsignado.id_vehiculo)
@@ -365,12 +412,14 @@ app.post('/api/solicitar-traslado', async (req, res) => {
             .query(`INSERT INTO operaciones.Traslados 
                     (id_cliente, id_chofer, id_vehiculo, punto_A, punto_B, distancia_km, costo_total, ganancia_empresa, pago_chofer, fecha_traslado, estado_pago_chofer)
                     VALUES 
-                    (@id_cliente, @id_chofer, @id_vehiculo, @punto_A, @punto_B, @distancia_km, @costo_total, @ganancia_empresa, @pago_chofer, GETDATE(), 'Pendiente')`);
+                    (@id_cliente, @id_chofer, @id_vehiculo, @punto_A, @punto_B, @distancia_km, @costo_total, @ganancia_empresa, @pago_chofer, GETDATE(), 'Pendiente');
+                    SELECT SCOPE_IDENTITY() AS id_traslado;`);
 
         await transaction.commit();
 
         res.json({
             success: true,
+            id_traslado: result.recordset[0].id_traslado,
             nuevoSaldoCliente: clienteUpdate.recordset[0].saldo_usuario,
             costoViaje: COSTO_TOTAL,
             chofer: choferAsignado
@@ -464,6 +513,31 @@ app.get('/api/admin/pagos-chofer/:id', async (req, res) => {
 
         res.json({ success: true, pagos: result.recordset });
     } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.post('/api/admin/registrar-pago', async (req, res) => {
+    try {
+        const { idChofer, referencia, monto } = req.body;
+        let pool = await sql.connect(dbConfig);
+
+        await pool.request()
+            .input('id_chofer', sql.Int, idChofer)
+            .input('referencia', sql.VarChar, referencia)
+            .input('monto', sql.Decimal(10, 2), monto)
+            .query(`
+                INSERT INTO operaciones.PagosChoferes (id_chofer, fecha_pago, nro_referencia, monto_pagado)
+                VALUES (@id_chofer, GETDATE(), @referencia, @monto);
+                
+                UPDATE operaciones.Traslados 
+                SET estado_pago_chofer = 'Cancelado' 
+                WHERE id_chofer = @id_chofer AND estado_pago_chofer = 'Pendiente';
+            `);
+
+        res.json({ success: true, message: "Pago registrado con éxito" });
+    } catch (err) {
+        console.error("Error al registrar pago:", err);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -582,6 +656,125 @@ app.put('/api/admin/aprobar-vehiculo/:id', async (req, res) => {
 // ==========================================
 // 9. ENDPOINTS PERFIL Y GESTIÓN DE CHOFERES
 // ==========================================
+app.get('/api/cliente/perfil/:id', async (req, res) => {
+    try {
+        const id_cliente = req.params.id;
+        const pool = await sql.connect(dbConfig);
+
+        const queryCliente = `
+            SELECT c.id_usuario, c.correo, cl.nombre, cl.apellido, cl.cedula, cl.telefono,
+                   ISNULL(cl.saldo_usuario, 0) as saldo_usuario, cl.direccion_frecuente
+            FROM usuarios.Cuentas c
+            INNER JOIN usuarios.Clientes cl ON c.id_usuario = cl.id_cliente
+            WHERE c.id_usuario = @id AND c.tipo_usuario = 'Cliente'
+        `;
+
+        const resultCliente = await pool.request().input('id', sql.Int, id_cliente).query(queryCliente);
+
+        if (resultCliente.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'Cliente no encontrado.' });
+        }
+
+        res.json({ success: true, cliente: resultCliente.recordset[0] });
+    } catch (err) {
+        console.error('Error en perfil cliente:', err);
+        res.status(500).json({ success: false, message: 'Error al cargar el perfil del cliente.', error: err.message });
+    }
+});
+
+app.get('/api/cliente/historial/:id', async (req, res) => {
+    try {
+        const id_cliente = req.params.id;
+        const inicio = req.query.inicio || '2000-01-01';
+        const fin = req.query.fin || '2099-12-31';
+        const pool = await sql.connect(dbConfig);
+
+        const query = `
+            SELECT TOP 50
+                t.id_traslado,
+                t.fecha_traslado,
+                t.punto_A,
+                t.punto_B,
+                t.costo_total,
+                ch.nombre AS nombre_chofer,
+                ch.apellido AS apellido_chofer,
+                CASE 
+                    WHEN t.estado_pago_chofer = 'Pendiente' THEN 'Pendiente'
+                    WHEN t.estado_pago_chofer IN ('Liquidado', 'Pagado', 'Completado') THEN 'Completado'
+                    WHEN t.estado_pago_chofer IN ('Cancelado', 'CanceladoPorChofer', 'CanceladoPorCliente') THEN 'Cancelado'
+                    ELSE COALESCE(t.estado_pago_chofer, 'Completado')
+                END AS estado
+            FROM operaciones.Traslados t
+            LEFT JOIN usuarios.Choferes ch ON t.id_chofer = ch.id_chofer
+            WHERE t.id_cliente = @id
+              AND t.fecha_traslado BETWEEN @inicio AND @fin
+            ORDER BY t.fecha_traslado DESC
+        `;
+
+        const result = await pool.request()
+            .input('id', sql.Int, id_cliente)
+            .input('inicio', sql.VarChar, inicio)
+            .input('fin', sql.VarChar, fin)
+            .query(query);
+
+        res.json({ success: true, viajes: result.recordset });
+    } catch (err) {
+        console.error('Error al cargar historial de traslados del cliente:', err);
+        res.status(500).json({ success: false, message: 'No se pudo cargar el historial.', error: err.message });
+    }
+});
+
+app.put('/api/cliente/actualizar-perfil/:id', async (req, res) => {
+    const id_cliente = req.params.id;
+    const { telefono, direccion_frecuente } = req.body;
+
+    try {
+        const pool = await sql.connect(dbConfig);
+
+        await pool.request()
+            .input('id_cliente', sql.Int, id_cliente)
+            .input('telefono', sql.VarChar, telefono || null)
+            .input('direccion_frecuente', sql.VarChar, direccion_frecuente || null)
+            .query(`
+                UPDATE usuarios.Clientes
+                SET telefono = ISNULL(@telefono, telefono),
+                    direccion_frecuente = ISNULL(@direccion_frecuente, direccion_frecuente)
+                WHERE id_cliente = @id_cliente
+            `);
+
+        res.json({ success: true, message: '¡Perfil actualizado con éxito!' });
+    } catch (err) {
+        console.error('Error al actualizar perfil cliente:', err);
+        res.status(500).json({ success: false, message: 'Error interno del servidor.', error: err.message });
+    }
+});
+
+app.put('/api/cliente/cambiar-password', async (req, res) => {
+    const { id_cuenta, contrasenaActual, contrasenaNueva } = req.body;
+
+    try {
+        const pool = await sql.connect(dbConfig);
+        const userRes = await pool.request()
+            .input('id', sql.Int, id_cuenta)
+            .input('pass', sql.VarChar, contrasenaActual)
+            .query(`SELECT * FROM usuarios.Cuentas WHERE id_usuario = @id AND contrasena = @pass`);
+
+        if (userRes.recordset.length === 0) {
+            return res.status(400).json({ success: false, message: 'La contraseña actual suministrada no es correcta.' });
+        }
+
+        await pool.request()
+            .input('id', sql.Int, id_cuenta)
+            .input('newPass', sql.VarChar, contrasenaNueva)
+            .query(`UPDATE usuarios.Cuentas SET contrasena = @newPass WHERE id_usuario = @id`);
+
+        res.json({ success: true, message: '¡Contraseña actualizada con éxito!' });
+    } catch (err) {
+        console.error('Error al cambiar contraseña cliente:', err);
+        res.status(500).json({ success: false, message: 'Error del servidor.', error: err.message });
+    }
+});
+
 app.get('/api/chofer/perfil/:id', async (req, res) => {
     try {
         const id_chofer = req.params.id;
@@ -633,7 +826,6 @@ app.get('/api/chofer/perfil/:id', async (req, res) => {
             WHERE id_chofer = @id
         `;
         const resultPendientes = await pool.request().input('id', sql.Int, id_chofer).query(queryPendientes);
-
         // Unimos ambas listas para que el chofer los visualice todos
         const vehiculosTotales = [...resultVehiculos.recordset, ...resultPendientes.recordset];
 
@@ -642,7 +834,8 @@ app.get('/api/chofer/perfil/:id', async (req, res) => {
             .input('id', sql.Int, id_chofer)
             .query('SELECT COUNT(id_traslado) AS total FROM operaciones.Traslados WHERE id_chofer = @id');
 
-        // Respuesta única unificada con todos los datos necesarios
+        // Log del saldo para depuración y Respuesta única unificada
+        console.log('Perfil chofer - saldo_a_favor (DB):', resultChofer.recordset[0].saldo_a_favor);
         res.json({
             success: true,
             chofer: resultChofer.recordset[0],
@@ -665,7 +858,7 @@ app.get('/api/chofer/traslados/:id', async (req, res) => {
         const pool = await sql.connect(dbConfig);
 
         const queryPendientes = `
-            SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
+            SELECT id_traslado, fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
             FROM operaciones.Traslados 
             WHERE id_chofer = @id AND estado_pago_chofer = 'Pendiente'
               AND fecha_traslado BETWEEN @inicio AND @fin
@@ -677,10 +870,18 @@ app.get('/api/chofer/traslados/:id', async (req, res) => {
         reqP.input('fin', sql.VarChar, fin);
         const resP = await reqP.query(queryPendientes);
 
-        const queryLiquidados = `
-            SELECT fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
+      const queryLiquidados = `
+            SELECT id_traslado, fecha_traslado, punto_A AS origen, punto_B AS destino, ISNULL(pago_chofer, 0) AS pago_chofer 
             FROM operaciones.Traslados 
-            WHERE id_chofer = @id AND estado_pago_chofer IN ('Liquidado', 'Pagado', 'Completado', 'Cancelado')
+            WHERE id_chofer = @id 
+              AND estado_pago_chofer IN (
+                  'Liquidado', 
+                  'Pagado', 
+                  'Completado', 
+                  'Cancelado', 
+                  'CanceladoPorChofer', 
+                  'CanceladoPorCliente'
+              )
               AND fecha_traslado BETWEEN @inicio AND @fin
             ORDER BY fecha_traslado DESC
         `;
@@ -911,7 +1112,170 @@ app.get('/api/admin/historial-pagos-chofer', async (req, res) => {
         res.status(500).json({ success: false, message: err.message });
     }
 });
+
+app.put('/api/admin/traslado/:id/cancelar', async (req, res) => {
+    try {
+        const { motivo, canceladoPor } = req.body;
+        let pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input('id_traslado', sql.Int, req.params.id)
+            .input('motivo', sql.VarChar, motivo)
+            .input('estado', sql.VarChar, `CanceladoPor${canceladoPor}`)
+            .query(`UPDATE operaciones.Traslados SET 
+                    estado_pago_chofer = @estado, 
+                    motivo_cancelacion = @motivo, 
+                    pago_chofer = 0.00, ganancia_empresa = 0.00 
+                    WHERE id_traslado = @id_traslado`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// 1. Ruta para obtener traslados cancelados del chofer
+app.get('/api/chofer/:id/traslados-cancelados', async (req, res) => {
+    try {
+        let pool = await sql.connect(dbConfig);
+        let result = await pool.request()
+            .input('id_chofer', sql.Int, req.params.id)
+            .query(`
+                SELECT id_traslado AS id_viaje, fecha_traslado AS fecha, punto_A AS origen, punto_B AS destino, motivo_cancelacion AS monto
+                FROM operaciones.Traslados
+                WHERE id_chofer = @id_chofer AND estado_pago_chofer LIKE 'Cancelado%'
+            `);
+        res.json({ success: true, trasladosCancelados: result.recordset });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// 2. Ruta para cancelar un traslado (Transacción)
+app.put('/api/traslados/:id/cancelar', async (req, res) => {
+    const { id } = req.params;
+    const { motivo, canceladoPor } = req.body; 
+
+    let pool = await sql.connect(dbConfig);
+    let transaction = new sql.Transaction(pool);
+
+    try {
+        await transaction.begin();
+
+        // 1. Obtener datos del viaje
+        let viajeRes = await transaction.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT id_cliente, costo_total FROM operaciones.Traslados WHERE id_traslado = @id`);
+
+        if (viajeRes.recordset.length === 0) throw new Error("Viaje no encontrado");
+        
+        const { id_cliente, costo_total } = viajeRes.recordset[0];
+
+        // 2. Actualizar el viaje
+        await transaction.request()
+            .input('id', sql.Int, id)
+            .input('motivo', sql.VarChar, motivo)
+            .input('estado', sql.VarChar, `CanceladoPor${canceladoPor}`)
+            .input('estado_traslado', sql.VarChar, 'Cancelado')
+            .query(`UPDATE operaciones.Traslados 
+                    SET estado_pago_chofer = @estado, 
+                        motivo_cancelacion = @motivo, 
+                        pago_chofer = 0.00, 
+                        ganancia_empresa = 0.00, 
+                        estado_traslado = @estado_traslado 
+                    WHERE id_traslado = @id`);
+
+        // 3. Devolver saldo al cliente
+        await transaction.request()
+            .input('id_cliente', sql.Int, id_cliente)
+            .input('monto', sql.Decimal(18, 2), costo_total)
+            .query(`UPDATE usuarios.Clientes SET saldo_usuario = saldo_usuario + @monto WHERE id_cliente = @id_cliente`);
+
+        await transaction.commit();
+        res.json({ success: true, message: "Viaje cancelado y saldo reembolsado." });
+
+    } catch (err) {
+        await transaction.rollback();
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
 // ==========================================
+// RUTA: Aceptar un traslado — acreditar pago al chofer
+// ==========================================
+app.put('/api/traslados/:id/aceptar', async (req, res) => {
+    const { id } = req.params;
+
+    let pool = await sql.connect(dbConfig);
+    let transaction = new sql.Transaction(pool);
+
+    try {
+        await transaction.begin();
+
+        // 1. Obtener datos del viaje (incluimos estado_traslado para evitar dobles aceptaciones)
+        let viajeRes = await transaction.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT id_chofer, pago_chofer, estado_traslado FROM operaciones.Traslados WHERE id_traslado = @id`);
+
+        if (viajeRes.recordset.length === 0) throw new Error('Viaje no encontrado');
+
+        const { id_chofer, pago_chofer, estado_traslado } = viajeRes.recordset[0];
+
+        // Si ya está aceptado, no permitimos volver a aceptarlo
+        if (estado_traslado && estado_traslado.toString().toLowerCase() === 'aceptado') {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Traslado ya fue aceptado previamente.' });
+        }
+
+        // 2. Actualizar sólo el estado de traslado a 'Aceptado' (no tocar estado_pago_chofer para evitar conflictos con CHECK)
+        await transaction.request()
+            .input('id', sql.Int, id)
+            .input('estado_traslado', sql.VarChar, 'Aceptado')
+            .query(`UPDATE operaciones.Traslados SET estado_traslado = @estado_traslado WHERE id_traslado = @id`);
+
+        // 3. Acreditar el pago al chofer
+        if (id_chofer && pago_chofer && Number(pago_chofer) > 0) {
+            await transaction.request()
+                .input('id_chofer', sql.Int, id_chofer)
+                .input('pago', sql.Decimal(18,2), pago_chofer)
+                .query(`UPDATE usuarios.Choferes SET saldo_a_favor = ISNULL(saldo_a_favor,0) + @pago WHERE id_chofer = @id_chofer`);
+        }
+
+        // Obtener nuevo saldo del chofer para devolverlo en la respuesta
+        let nuevoSaldo = null;
+        if (id_chofer) {
+            const saldoRes = await transaction.request()
+                .input('id_chofer', sql.Int, id_chofer)
+                .query(`SELECT ISNULL(saldo_a_favor,0) AS saldo_a_favor FROM usuarios.Choferes WHERE id_chofer = @id_chofer`);
+            if (saldoRes.recordset.length > 0) nuevoSaldo = saldoRes.recordset[0].saldo_a_favor;
+        }
+
+        await transaction.commit();
+        res.json({ success: true, message: 'Traslado aceptado y pago acreditado al chofer.', nuevoSaldoChofer: nuevoSaldo, pagoAcreditado: pago_chofer });
+
+    } catch (err) {
+        await transaction.rollback();
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+app.get('/api/admin/historial-cancelaciones-chofer/:id_chofer', async (req, res) => {
+    try {
+        let pool = await sql.connect(dbConfig);
+        
+        // Definimos la consulta aquí
+       const query = `
+            SELECT id_traslado, fecha_traslado, punto_A, punto_B, motivo_cancelacion, estado_pago_chofer
+            FROM operaciones.Traslados
+            WHERE id_chofer = @id_chofer
+            AND (estado_pago_chofer = 'Cancelado' OR estado_pago_chofer LIKE 'CanceladoPor%')
+        `;
+
+        // Ejecutamos la petición una sola vez
+        let result = await pool.request()
+            .input('id_chofer', sql.Int, req.params.id_chofer)
+            .query(query);
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});// ==========================================
 // 10. ARRANQUE DEL SERVIDOR
 // ==========================================
 const PORT = process.env.PORT || 3000;

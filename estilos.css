@@ -144,9 +144,6 @@ a:hover {
     text-decoration: underline;
 }
 
-.oculto {
-    display: none !important;
-}
 
 /* Cajas de Estado, Saldos y Métricas */
 .saldo-box {
@@ -353,6 +350,66 @@ a:hover {
     border-top: 3px solid var(--rosa-principal);
 }
 
+.section-card {
+    background-color: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(255,183,197,0.08);
+}
+
+.form-tip {
+    color: #9a7076;
+    font-size: 13px;
+    margin: 0 0 15px 0;
+}
+
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.input-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--texto-color);
+}
+
+.input-group input,
+.input-group select {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.btn-primary,
+.btn-secondary {
+    margin-top: 14px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background-color: var(--rosa-principal);
+    color: white;
+}
+
+.btn-secondary {
+    background-color: #f2ebee;
+    color: var(--rosa-oscuro);
+}
+
 /* RESPONSIVE DESIGN (MEDIA QUERY PARA PANTALLAS PEQUEÑAS) */
 @media (max-width: 768px) {
     .expediente-main-box, .tables-split-grid, .form-grid-2 {
@@ -374,3 +431,199 @@ a:hover {
 .campo-filto input { margin-bottom: 0; }
 .btn-buscar-carrera { margin-bottom: 0; padding: 11px 20px; }
 hr { border: 0; border-top: 1px solid var(--border-color); margin: 22px 0; }
+/* 1. Por defecto, todos los paneles se ocultan */
+/* Por defecto, los contenedores card se ocultan */
+
+
+/* Clase necesaria para ocultar elementos en JS (puedes conservarla por si acaso) */
+.oculto {
+    display: none !important;
+}
+
+
+/* Ajuste adicional para el modal: Asegura que se vea bien centrado */
+#modal-cancelar {
+    z-index: 10000; /* Asegura que el modal flote sobre todo */
+    pointer-events: auto;
+}
+
+/* Espaciado para la tarjeta de Viaje en Curso */
+#card-viaje-activo {
+    padding: 25px; /* Más espacio interno */
+    margin-top: 20px;
+    border: 2px solid var(--rosa-principal); /* Un borde que resalte */
+}
+
+/* Espacio entre etiquetas y datos */
+#card-viaje-activo p {
+    margin: 10px 0;
+    font-size: 15px;
+}
+
+/* Que los datos se vean resaltados */
+#card-viaje-activo span {
+    font-weight: 600;
+    color: var(--texto-color);
+}
+
+/* Fondo oscuro que cubre toda la pantalla real */
+.modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(82, 70, 72, 0.6) !important; /* Tono oscuro acorde a tu paleta */
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 99999 !important;
+}
+
+/* Ocultar modal */
+.modal.oculto {
+    display: none !important;
+}
+
+/* La tarjeta centralizada del modal */
+.modal-contenido {
+    background: var(--card-bg) !important;
+    padding: 30px !important;
+    border-radius: 20px !important;
+    width: 90% !important;
+    max-width: 440px !important;
+    box-shadow: 0 15px 35px rgba(212, 131, 147, 0.3) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    border: 1px solid var(--border-color) !important;
+    position: relative !important;
+}
+
+/* --- CORRECCIÓN DE LA CABECERA DE PERFIL --- */
+.perfil-header-card {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+    gap: 20px;
+    border: 1px solid #e1e4e8;
+}
+
+.perfil-avatar-placeholder {
+    font-size: 32px;
+    background: #f1f3f5;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.perfil-info-principal h2 {
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+    font-size: 20px;
+}
+
+.perfil-info-principal p {
+    margin: 0 0 8px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+/* --- CORRECCIÓN CLAVE: PESTAÑAS EN FILA HORIZONTAL --- */
+.tabs-container-perfil {
+    display: flex;
+    flex-direction: row; /* Fuerza a que estén en horizontal */
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e1e4e8;
+    padding-bottom: 12px;
+    overflow-x: auto;
+    width: 100%;
+}
+
+.tab-btn-perfil {
+    background: #f8f9fa;
+    border: 1px solid #dcedc8; /* O un borde sutil neutral */
+    border-color: #d1d5db;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #4b5563;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tab-btn-perfil:hover {
+    background: #f3f4f6;
+    color: #1f2937;
+}
+
+/* Estado activo de la pestaña */
+.tab-btn-perfil.active {
+    background: #1f2937 !important;
+    color: #ffffff !important;
+    border-color: #1f2937 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* --- TARJETAS INTERNAS --- */
+.card-seccion-perfil {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    margin-bottom: 15px;
+    border: 1px solid #e5e7eb;
+}
+
+.card-seccion-perfil h3 {
+    margin-top: 0;
+    color: #1f2937;
+    font-size: 16px;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+/* Utilidad para ocultar */
+/* =================================================================
+   CORRECCIÓN DEFINITIVA DE VISIBILIDAD DE PESTAÑAS (DECARRERITA)
+   ================================================================= */
+
+/* Asegurar que cualquier sección con la clase oculto desaparezca por completo */
+.oculto {
+    display: none !important;
+}
+
+/* Forzar que las pestañas del panel de cliente muestren su contenido correctamente al activarse */
+.tab-content-perfil {
+    display: block !important;
+}
+
+/* Si tienen la clase oculto combinada, se anulan y se ocultan */
+.tab-content-perfil.oculto {
+    display: none !important;
+}
+
+/* Lo mismo aplica para las pestañas del chofer si usas la misma estructura */
+.tab-content-chof {
+    display: block !important;
+}
+
+.tab-content-chof.oculto {
+    display: none !important;
+}

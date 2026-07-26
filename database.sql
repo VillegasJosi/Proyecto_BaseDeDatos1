@@ -48,6 +48,7 @@ CREATE TABLE usuarios.Clientes (
     telefono VARCHAR(15) NOT NULL,
     cedula VARCHAR(15) NOT NULL UNIQUE,
     saldo_usuario DECIMAL(18,2) CONSTRAINT DF_SaldoCliente DEFAULT 0.00 CONSTRAINT CK_SaldoPositivo CHECK (saldo_usuario >= 0),
+    direccion_frecuente VARCHAR(200) NULL,
     CONSTRAINT FK_Clientes_Cuentas FOREIGN KEY (id_cliente) REFERENCES usuarios.Cuentas(id_usuario) ON DELETE CASCADE
 );
 
@@ -298,4 +299,3 @@ VALUES (2, 4.90, '2026-06-30', 'PAGO0001');
 
 -- Se actualizan los traslados correspondientes a estado 'Cancelado'
 UPDATE operaciones.Traslados SET estado_pago_chofer = 'Cancelado' WHERE id_chofer = 2 AND fecha_traslado = '2026-06-30';
-UPDATE usuarios.Choferes
